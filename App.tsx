@@ -1676,7 +1676,7 @@ export default function App() {
         </div>
 
         <div className="p-4 border-t border-indigo-800 text-xs text-slate-400 text-center">
-          v1.3.1 - Force Update
+          v1.3.3 - Fix Version Conflict
         </div>
       </aside>
 
