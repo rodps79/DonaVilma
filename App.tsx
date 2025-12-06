@@ -15,7 +15,22 @@ import {
   RefreshCcw,
   Calendar,
   ChevronRight,
-  Info
+  Info,
+  X,
+  Edit2,
+  Clock,
+  Link as LinkIcon,
+  Maximize2,
+  ArrowUpFromLine,
+  Minimize2,
+  Zap,
+  Plug,
+  BoxSelect,
+  MoreVertical,
+  Map as MapIcon,
+  Image as ImageIcon,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -37,7 +52,9 @@ import { Room, UnitPrice, FixedCost } from './types';
 const STYLES = {
   input: "w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent block p-2.5 transition-all outline-none hover:bg-white",
   inputSmall: "bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent block p-1.5 transition-all outline-none text-center",
+  inputCompact: "w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block px-2.5 py-1.5 transition-all outline-none shadow-sm font-medium",
   label: "block mb-1 text-xs font-semibold text-slate-500 uppercase tracking-wide",
+  labelCompact: "block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1",
   card: "bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 ring-1 ring-slate-900/5",
   tableHeader: "bg-slate-50 text-slate-500 text-xs uppercase font-semibold tracking-wider text-left py-3 px-4 border-b border-slate-100",
   tableCell: "py-3 px-4 text-sm text-slate-600 border-b border-slate-50 group-hover:bg-slate-50/50 transition-colors",
@@ -53,6 +70,22 @@ const getRoomDimensions = (room: Room) => {
   const ceilingArea = floorArea;
   
   return { floorArea, perimeter, wallAreaNet, ceilingArea };
+};
+
+// --- Types for Schedule ---
+type ScheduleOverride = {
+  duration?: number;
+  startDay?: number;
+  dependency?: string | null; // null = no dependency
+};
+
+type Task = { 
+  id: string; 
+  name: string; 
+  startDay: number; 
+  duration: number; 
+  color: string; 
+  dependency?: string | null; 
 };
 
 // --- Helper Components ---
@@ -138,16 +171,117 @@ const TaskCostDisplay = ({ room, taskKey, unitPrices, fixedCosts }: TaskCostDisp
   const f = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
 
   return (
-    <span className="text-[10px] text-slate-400 font-medium ml-auto bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
-      MO: {f(labor)} {material > 0 && `• Mat: ${f(material)}`}
+    <span className="text-[10px] text-slate-500 font-semibold bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-sm">
+      {f(labor + material)}
     </span>
+  );
+};
+
+// --- Edit Task Modal Component (Extracted) ---
+interface EditTaskModalProps {
+  task: Task;
+  availableDeps: { id: string; name: string }[];
+  onClose: () => void;
+  onSave: (id: string, updates: ScheduleOverride) => void;
+}
+
+const EditTaskModal: React.FC<EditTaskModalProps> = ({ task, availableDeps, onClose, onSave }) => {
+  // Local state for the modal form
+  const [duration, setDuration] = useState(task.duration);
+  const [dependency, setDependency] = useState<string | null>(task.dependency || null);
+  const [startDay, setStartDay] = useState(task.startDay);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 m-4 ring-1 ring-slate-900/5">
+        <div className="flex justify-between items-start mb-6">
+          <div>
+             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+               <Edit2 size={18} className="text-blue-500" />
+               Editar Atividade
+             </h3>
+             <p className="text-sm text-slate-500">{task.name}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          {/* Dependency Selector */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+               <LinkIcon size={14} /> Dependência (Predecessora)
+            </label>
+            <select 
+              className={STYLES.input}
+              value={dependency || ''}
+              onChange={(e) => {
+                  const val = e.target.value === '' ? null : e.target.value;
+                  setDependency(val);
+                  // If switching to manual (no dep), default start day to current calculated start day
+                  if (val === null) setStartDay(task.startDay);
+              }}
+            >
+              <option value="">-- Sem Dependência (Manual) --</option>
+              {availableDeps.map(dep => (
+                <option key={dep.id} value={dep.id}>{dep.name}</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-slate-400 mt-1">
+              A atividade iniciará automaticamente após o fim da tarefa selecionada.
+            </p>
+          </div>
+
+          {/* Start Day (Only if no dependency) */}
+          <div className={dependency ? 'opacity-50 pointer-events-none' : ''}>
+             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+               <Calendar size={14} /> Dia de Início
+            </label>
+            <input 
+              type="number" 
+              min="0"
+              value={startDay}
+              onChange={(e) => setStartDay(Math.max(0, parseInt(e.target.value) || 0))}
+              className={STYLES.input}
+              disabled={!!dependency}
+            />
+            {dependency && <span className="text-[10px] text-blue-500">Calculado automaticamente pela dependência.</span>}
+          </div>
+
+          {/* Duration */}
+          <div>
+             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+               <Clock size={14} /> Duração (Dias)
+            </label>
+            <input 
+              type="number" 
+              min="1"
+              value={duration}
+              onChange={(e) => setDuration(Math.max(1, parseInt(e.target.value) || 1))}
+              className={STYLES.input}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-8 pt-6 border-t border-slate-100">
+          <Button variant="ghost" onClick={onClose} className="flex-1 justify-center">Cancelar</Button>
+          <Button 
+              onClick={() => onSave(task.id, { duration, dependency, startDay: dependency ? undefined : startDay })} 
+              className="flex-1 justify-center"
+          >
+              Salvar Alterações
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 };
 
 // --- Application ---
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'rooms' | 'prices' | 'synthesis' | 'meeting' | 'schedule'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'rooms' | 'prices' | 'synthesis' | 'meeting' | 'schedule' | 'floorplan'>('dashboard');
   
   // --- Initialize State from LocalStorage or Constants ---
   const [rooms, setRooms] = useState<Room[]>(() => {
@@ -177,6 +311,31 @@ export default function App() {
     }
   });
 
+  // Schedule Overrides State
+  const [scheduleOverrides, setScheduleOverrides] = useState<Record<string, ScheduleOverride>>(() => {
+    try {
+      const saved = localStorage.getItem('reforma_schedule_overrides');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Floor Plan Image State
+  const [floorPlanImage, setFloorPlanImage] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('reforma_floorplan');
+    } catch {
+      return null;
+    }
+  });
+
+  // Modal State
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  // Tooltip State (Moved to Top Level to fix Hook Rule #310)
+  const [scheduleTooltip, setScheduleTooltip] = useState<{ visible: boolean; x: number; y: number; content: any } | null>(null);
+
   const [highlightedRoomId, setHighlightedRoomId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -192,6 +351,23 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('reforma_costs', JSON.stringify(fixedCosts));
   }, [fixedCosts]);
+
+  useEffect(() => {
+    localStorage.setItem('reforma_schedule_overrides', JSON.stringify(scheduleOverrides));
+  }, [scheduleOverrides]);
+
+  useEffect(() => {
+    if (floorPlanImage) {
+        try {
+            localStorage.setItem('reforma_floorplan', floorPlanImage);
+        } catch (e) {
+            console.error("Erro ao salvar imagem (provavelmente muito grande):", e);
+            alert("Atenção: A imagem é muito grande para salvar no navegador. Ela será perdida ao recarregar. Tente uma imagem menor.");
+        }
+    } else {
+        localStorage.removeItem('reforma_floorplan');
+    }
+  }, [floorPlanImage]);
 
   // --- Sync Effects (Room Counts -> Fixed Costs) ---
   useEffect(() => {
@@ -222,6 +398,8 @@ export default function App() {
       rooms,
       unitPrices,
       fixedCosts,
+      scheduleOverrides,
+      floorPlanImage, // Include image in backup
       exportedAt: new Date().toISOString(),
       version: "1.0"
     };
@@ -254,6 +432,8 @@ export default function App() {
         if (data.rooms) setRooms(data.rooms);
         if (data.unitPrices) setUnitPrices(data.unitPrices);
         if (data.fixedCosts) setFixedCosts(data.fixedCosts);
+        if (data.scheduleOverrides) setScheduleOverrides(data.scheduleOverrides);
+        if (data.floorPlanImage) setFloorPlanImage(data.floorPlanImage);
         
         alert('Dados importados com sucesso!');
       } catch (error) {
@@ -271,6 +451,8 @@ export default function App() {
       setRooms(INITIAL_ROOMS);
       setUnitPrices(INITIAL_PRICES);
       setFixedCosts(INITIAL_FIXED_COSTS);
+      setScheduleOverrides({});
+      setFloorPlanImage(null);
     }
   };
 
@@ -384,7 +566,7 @@ export default function App() {
     };
   }, [rooms, unitPrices, fixedCosts]);
 
-  // --- Schedule Calculations (Lifted) ---
+  // --- Schedule Calculations (Revised with Overrides) ---
   const scheduleData = useMemo(() => {
     // 1. Calculate total quantities
     const totals = {
@@ -399,7 +581,6 @@ export default function App() {
       electricalFinishCount: 0
     };
 
-    // From Rooms
     rooms.forEach(r => {
       const { floorArea, wallAreaNet, ceilingArea } = getRoomDimensions(r);
       if (r.tasks.demo_floor) totals.demoArea += floorArea;
@@ -416,7 +597,6 @@ export default function App() {
       if (r.tasks.ref_ceiling_paint) totals.paintingArea += ceilingArea;
     });
 
-    // From Fixed Costs
     fixedCosts.forEach(fc => {
       const name = fc.item.toLowerCase();
       if (name.includes('telhado')) totals.roofArea += fc.quantity;
@@ -425,89 +605,128 @@ export default function App() {
       if (name.includes('interruptor') || name.includes('tomada')) totals.electricalFinishCount += fc.quantity;
     });
 
-    // 2. Define Productivity Rates
     const RATES = {
       demo: 20, roof: 20, infra: 5, masonry: 15, gypsum: 20,
       tiling: 10, install: 2, painting: 30, elecFinish: 15
     };
 
-    // 3. Build Timeline
-    const tasks: { id: string; name: string; startDay: number; duration: number; color: string; dependency?: string }[] = [];
+    // 2. Define Base Tasks (Automatic Definitions)
+    // Structure: { id, name, defaultDuration, defaultDependency }
+    const baseTasksDefinition = [
+      { id: 'demo', name: '1. Demolição & Retirada', qty: totals.demoArea, rate: RATES.demo, defaultDep: null, color: 'bg-rose-500' },
+      { id: 'roof', name: '2. Telhado & Estrutura', qty: totals.roofArea, rate: RATES.roof, defaultDep: 'demo', color: 'bg-slate-600' },
+      { id: 'infra', name: '3. Infra (Elét/Hidr/Imper)', qty: totals.infraCount * 5, rate: 1, defaultDep: 'demo', color: 'bg-blue-500' }, // hacky rate adjust
+      { id: 'masonry', name: '4. Reboco e Contrapiso', qty: totals.masonryArea, rate: RATES.masonry, defaultDep: 'infra', color: 'bg-orange-500' },
+      { id: 'gypsum', name: '5. Forros (Gesso/PVC)', qty: totals.gypsumArea, rate: RATES.gypsum, defaultDep: 'masonry', color: 'bg-indigo-400' },
+      { id: 'tiling', name: '6. Revestimentos (Piso/Par)', qty: totals.tilingArea, rate: RATES.tiling, defaultDep: 'masonry', color: 'bg-emerald-500' },
+      { id: 'install', name: '7. Esquadrias e Portas', qty: totals.installationsCount, rate: RATES.install, defaultDep: 'masonry', color: 'bg-yellow-600' },
+      { id: 'painting', name: '8. Pintura Geral', qty: totals.paintingArea, rate: RATES.painting, defaultDep: 'tiling', color: 'bg-cyan-500' },
+      { id: 'finish', name: '9. Acabamentos Finais', qty: totals.electricalFinishCount, rate: RATES.elecFinish, defaultDep: 'painting', color: 'bg-violet-500' },
+    ];
 
-    // Phase 1: Demolition
-    const demoDuration = Math.ceil(totals.demoArea / RATES.demo);
-    if (demoDuration > 0) tasks.push({ id: 'demo', name: '1. Demolição & Retirada', startDay: 0, duration: Math.max(2, demoDuration), color: 'bg-rose-500' });
-    const endDemo = tasks.find(t => t.id === 'demo')?.duration || 0;
+    // 3. Build Final Task List combining Auto + Overrides
+    const activeTasksMap = new Map<string, Task>();
 
-    // Phase 2: Structural & Roof
-    const roofDuration = Math.ceil(totals.roofArea / RATES.roof);
-    let endStructural = endDemo;
-    if (roofDuration > 0) {
-      tasks.push({ id: 'roof', name: '2. Telhado & Estrutura', startDay: endDemo, duration: Math.max(3, roofDuration), color: 'bg-slate-600', dependency: 'demo' });
-      endStructural = endDemo + Math.max(3, roofDuration);
-    }
+    // First pass: Instantiate objects with duration overrides
+    baseTasksDefinition.forEach(def => {
+      // Logic to determine if task exists: Quantity > 0 OR user manually set a duration > 0 (even if qty is 0, user might want to add it manually)
+      const override = scheduleOverrides[def.id];
+      const autoDuration = Math.ceil(def.qty / def.rate);
+      
+      // If auto duration is 0 and no override duration, skip it.
+      if (autoDuration <= 0 && !override?.duration) return;
 
-    // Phase 3: Infra
-    const infraDuration = totals.infraCount * RATES.infra; 
-    let endInfra = endDemo;
-    if (infraDuration > 0) {
-       tasks.push({ id: 'infra', name: '3. Infra (Elét/Hidr/Imper)', startDay: endDemo + 1, duration: Math.max(2, infraDuration), color: 'bg-blue-500', dependency: 'demo' });
-       endInfra = endDemo + 1 + Math.max(2, infraDuration);
-    }
+      const finalDuration = override?.duration !== undefined ? override.duration : Math.max(1, autoDuration); // Min 1 day if active
+      
+      // Determine Dependency
+      // If override.dependency is null -> No dependency
+      // If override.dependency is undefined -> Use defaultDep
+      // If override.dependency is string -> Use string
+      let finalDep = def.defaultDep;
+      if (override && override.dependency !== undefined) {
+         finalDep = override.dependency;
+      }
 
-    // Phase 4: Masonry
-    const startMasonry = Math.max(endStructural, endInfra);
-    const masonryDuration = Math.ceil(totals.masonryArea / RATES.masonry);
-    let endMasonry = startMasonry;
-    if (masonryDuration > 0) {
-      tasks.push({ id: 'masonry', name: '4. Reboco e Contrapiso', startDay: startMasonry, duration: Math.max(3, masonryDuration), color: 'bg-orange-500', dependency: 'infra' });
-      endMasonry = startMasonry + Math.max(3, masonryDuration);
-    }
+      activeTasksMap.set(def.id, {
+        id: def.id,
+        name: def.name,
+        duration: finalDuration,
+        startDay: 0, // Calculated next
+        color: def.color,
+        dependency: finalDep
+      });
+    });
 
-    // Phase 5: Gypsum
-    const gypsumDuration = Math.ceil(totals.gypsumArea / RATES.gypsum);
-    let endGypsum = endMasonry;
-    if (gypsumDuration > 0) {
-       const startGypsum = endMasonry - Math.min(2, Math.floor(masonryDuration * 0.2)); 
-       tasks.push({ id: 'gypsum', name: '5. Forros (Gesso/PVC)', startDay: startGypsum, duration: Math.max(2, gypsumDuration), color: 'bg-indigo-400', dependency: 'masonry' });
-       endGypsum = startGypsum + Math.max(2, gypsumDuration);
-    }
+    // 4. Resolve Dates (Topological/Recursive resolve)
+    // Helper to prevent infinite loops
+    const resolveStartDay = (taskId: string, visited: Set<string>): number => {
+       if (visited.has(taskId)) return 0; // Cycle detected, fallback
+       visited.add(taskId);
 
-    // Phase 6: Tiling
-    const tilingDuration = Math.ceil(totals.tilingArea / RATES.tiling);
-    let endTiling = endMasonry;
-    if (tilingDuration > 0) {
-       const startTiling = endMasonry + 1; 
-       tasks.push({ id: 'tiling', name: '6. Revestimentos (Piso/Par)', startDay: startTiling, duration: Math.max(3, tilingDuration), color: 'bg-emerald-500', dependency: 'masonry' });
-       endTiling = startTiling + Math.max(3, tilingDuration);
-    }
+       const task = activeTasksMap.get(taskId);
+       if (!task) return 0;
 
-    // Phase 7: Installations
-    const installDuration = Math.ceil(totals.installationsCount / RATES.install);
-    if (installDuration > 0) {
-       tasks.push({ id: 'install', name: '7. Esquadrias e Portas', startDay: endMasonry + 1, duration: Math.max(1, installDuration), color: 'bg-yellow-600', dependency: 'masonry' });
-    }
+       // If manual start day is set and NO dependency (or dep is explicitly null in override logic)
+       const override = scheduleOverrides[taskId];
+       // Check if dependency is effectively null (either overridden to null, or default was null and not overridden)
+       const isDepNull = task.dependency === null;
+       
+       if (isDepNull) {
+          return override?.startDay || 0;
+       }
 
-    // Phase 8: Painting
-    const startPainting = Math.max(endGypsum, endTiling - 2); 
-    const paintingDuration = Math.ceil(totals.paintingArea / RATES.painting);
-    let endPainting = startPainting;
-    if (paintingDuration > 0) {
-       tasks.push({ id: 'painting', name: '8. Pintura Geral', startDay: startPainting, duration: Math.max(3, paintingDuration), color: 'bg-cyan-500', dependency: 'tiling' });
-       endPainting = startPainting + Math.max(3, paintingDuration);
-    }
+       // Has dependency
+       if (task.dependency) {
+         const parentId = task.dependency;
+         const parent = activeTasksMap.get(parentId);
+         if (parent) {
+           return resolveStartDay(parentId, new Set(visited)) + parent.duration;
+         }
+         // If parent is not active, treat as no dependency
+         return override?.startDay || 0;
+       }
+       
+       return 0;
+    };
 
-    // Phase 9: Finishings
-    const elecFinDuration = Math.ceil(totals.electricalFinishCount / RATES.elecFinish);
-    if (elecFinDuration > 0) {
-      tasks.push({ id: 'finish', name: '9. Acabamentos Finais', startDay: endPainting, duration: Math.max(1, elecFinDuration), color: 'bg-violet-500', dependency: 'painting' });
-    }
+    // Calculate start day for all
+    const finalTasks: Task[] = [];
+    activeTasksMap.forEach(task => {
+       task.startDay = resolveStartDay(task.id, new Set());
+       finalTasks.push(task);
+    });
 
-    const maxDay = Math.max(...tasks.map(t => t.startDay + t.duration), 0);
-    const totalDays = maxDay > 0 ? maxDay + 2 : 0; // buffer only if there are tasks
+    // Sort by start day for visualization
+    finalTasks.sort((a, b) => a.startDay - b.startDay);
 
-    return { tasks, totalDays };
-  }, [rooms, fixedCosts]);
+    const maxDay = Math.max(...finalTasks.map(t => t.startDay + t.duration), 0);
+    const totalDays = maxDay > 0 ? maxDay + 2 : 0; 
+
+    return { tasks: finalTasks, totalDays };
+  }, [rooms, fixedCosts, scheduleOverrides]);
+
+  // --- Actions for Schedule Editing ---
+
+  const handleTaskClick = (task: Task) => {
+    setEditingTask(task);
+  };
+
+  const saveTaskChanges = (taskId: string, updates: ScheduleOverride) => {
+    setScheduleOverrides(prev => ({
+      ...prev,
+      [taskId]: {
+        ...prev[taskId],
+        ...updates
+      }
+    }));
+    setEditingTask(null);
+  };
+
+  const getAvailableDependencies = (currentTaskId: string) => {
+    return scheduleData.tasks
+      .filter(t => t.id !== currentTaskId) // Can't depend on self
+      .map(t => ({ id: t.id, name: t.name }));
+  };
 
   // --- Cost Helper ---
 
@@ -617,18 +836,24 @@ export default function App() {
 
   // --- Views ---
 
+  // NOTE: EditTaskModal moved outside App to prevent re-creation on every render
+
   const ScheduleView = () => {
     // Uses data lifted to App level to avoid conditional hooks
     const { tasks, totalDays } = scheduleData;
+    // NOTE: Tooltip state removed from here to fix Hook error #310
 
     return (
       <div className="space-y-6 animate-fade-in pb-12" key={activeTab}>
+        {/* Modal rendered by parent conditionally */}
+        
         <Card className="p-8">
           <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-6">
             <div>
               <h2 className="text-2xl font-bold text-slate-800">Cronograma Estimado</h2>
               <p className="text-slate-500 mt-2 max-w-2xl text-sm leading-relaxed">
-                Este cronograma é uma projeção baseada nas quantidades levantadas e produtividade média de uma equipe padrão (2-3 pessoas).
+                Este cronograma é uma projeção baseada nas quantidades levantadas. <br/>
+                <span className="text-blue-600 font-medium">Clique nas barras para editar a duração ou mudar as dependências.</span>
               </p>
             </div>
              <div className="flex flex-col items-end gap-2 bg-slate-50 p-4 rounded-xl border border-slate-100 min-w-[200px]">
@@ -672,8 +897,10 @@ export default function App() {
                     
                     return (
                       <div key={task.id} className="flex hover:bg-slate-50 group transition-colors">
-                        <div className="w-64 flex-shrink-0 p-4 text-sm font-medium text-slate-700 border-r border-slate-200 bg-white group-hover:bg-slate-50 sticky left-0 z-10 truncate flex items-center" title={task.name}>
+                        <div className="w-64 flex-shrink-0 p-4 text-sm font-medium text-slate-700 border-r border-slate-200 bg-white group-hover:bg-slate-50 sticky left-0 z-10 truncate flex items-center gap-2" title={task.name}>
                           {task.name}
+                          {/* Indicator if modified */}
+                          {scheduleOverrides[task.id] && <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" title="Modificado manualmente"></div>}
                         </div>
                         <div className="flex-1 relative h-14 my-auto">
                             {/* Grid Lines */}
@@ -682,14 +909,25 @@ export default function App() {
                             ))}
                             
                             {/* Bar */}
-                            <div 
-                              className={`absolute top-3 h-8 rounded-lg shadow-sm ${task.color} opacity-90 hover:opacity-100 transition-all flex items-center px-3 ring-1 ring-black/5 hover:scale-[1.01] origin-left`}
+                            <button 
+                              onClick={() => handleTaskClick(task)}
+                              onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setScheduleTooltip({
+                                    visible: true,
+                                    x: rect.left + (rect.width / 2),
+                                    y: rect.top,
+                                    content: { name: task.name, duration: task.duration, start: task.startDay, end: task.startDay + task.duration }
+                                });
+                              }}
+                              onMouseLeave={() => setScheduleTooltip(null)}
+                              className={`absolute top-3 h-8 rounded-lg shadow-sm ${task.color} opacity-90 hover:opacity-100 transition-all flex items-center px-3 ring-1 ring-black/5 hover:scale-[1.01] hover:ring-2 hover:ring-blue-400 cursor-pointer origin-left z-10`}
                               style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
                             >
                               <span className="text-[10px] text-white font-bold drop-shadow-sm whitespace-nowrap overflow-hidden">
                                 {task.duration}d
                               </span>
-                            </div>
+                            </button>
                         </div>
                       </div>
                     );
@@ -703,12 +941,128 @@ export default function App() {
               <Info className="flex-shrink-0 text-amber-500 mt-0.5" size={20} />
               <div className="text-sm">
                 <strong className="block mb-1 font-semibold">Nota Importante</strong>
-                Este cronograma é gerado automaticamente considerando dependências lógicas (Predecessoras). 
-                Exemplo: A pintura só inicia após o término do gesso e revestimentos. O prazo real pode variar conforme tamanho da equipe e imprevistos da obra.
+                O cronograma é gerado automaticamente com base em predecessoras padrão. 
+                Ao alterar uma dependência, todas as datas subsequentes serão recalculadas automaticamente.
               </div>
            </div>
         </Card>
+
+        {/* Custom Floating Tooltip Portal */}
+        {scheduleTooltip && (
+            <div 
+                className="fixed z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full pb-2 animate-fade-in"
+                style={{ left: scheduleTooltip.x, top: scheduleTooltip.y }}
+            >
+                <div className="bg-slate-900 text-white text-xs rounded-lg py-2 px-3 shadow-xl flex flex-col gap-1 min-w-[120px]">
+                    <span className="font-bold border-b border-slate-700 pb-1 mb-1">{scheduleTooltip.content.name}</span>
+                    <div className="flex justify-between gap-4 text-slate-300">
+                        <span>Duração:</span>
+                        <span className="text-white font-mono">{scheduleTooltip.content.duration} dias</span>
+                    </div>
+                    <div className="flex justify-between gap-4 text-slate-300">
+                        <span>Início:</span>
+                        <span className="text-white font-mono">Dia {scheduleTooltip.content.start + 1}</span>
+                    </div>
+                     <div className="flex justify-between gap-4 text-slate-300">
+                        <span>Fim:</span>
+                        <span className="text-white font-mono">Dia {scheduleTooltip.content.end}</span>
+                    </div>
+                    <div className="text-[10px] text-blue-400 mt-1 italic text-center">Clique para editar</div>
+                    {/* Arrow */}
+                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1 w-2 h-2 bg-slate-900 rotate-45"></div>
+                </div>
+            </div>
+        )}
       </div>
+    );
+  };
+
+  const FloorPlanView = () => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [scale, setScale] = useState(1);
+
+    const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Check size (e.g. limit to 4MB for localStorage safety)
+        if (file.size > 4 * 1024 * 1024) {
+            alert("A imagem é muito grande (>4MB). Por favor, use uma imagem menor para garantir que ela seja salva.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const result = e.target?.result as string;
+            setFloorPlanImage(result);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    return (
+        <div className="space-y-6 animate-fade-in pb-12" key={activeTab}>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800">Planta Baixa de Referência</h2>
+                    <p className="text-slate-500 text-sm mt-1">
+                        Armazene a imagem do projeto aqui para consulta rápida durante o orçamento.
+                    </p>
+                </div>
+                {floorPlanImage && (
+                    <div className="flex gap-2">
+                        <Button variant="secondary" onClick={() => setScale(s => Math.max(0.5, s - 0.1))}>
+                            <ZoomOut size={18} />
+                        </Button>
+                        <Button variant="secondary" onClick={() => setScale(s => Math.min(3, s + 0.1))}>
+                            <ZoomIn size={18} />
+                        </Button>
+                        <Button variant="danger" onClick={() => setFloorPlanImage(null)}>
+                            <Trash2 size={18} /> Remover
+                        </Button>
+                    </div>
+                )}
+            </div>
+
+            <Card className="p-0 min-h-[600px] flex items-center justify-center bg-slate-100 overflow-hidden relative border border-slate-200">
+                {!floorPlanImage ? (
+                    <div className="text-center p-12">
+                        <div className="bg-white p-6 rounded-full inline-flex mb-6 shadow-sm">
+                            <ImageIcon size={48} className="text-slate-300" />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-700 mb-2">Nenhuma planta cadastrada</h3>
+                        <p className="text-slate-500 mb-8 max-w-md mx-auto">
+                            Faça o upload da imagem da planta baixa (JPG, PNG) para tê-la sempre à mão enquanto edita os ambientes.
+                        </p>
+                        <Button onClick={() => fileInputRef.current?.click()} className="mx-auto">
+                            <Upload size={20} /> Carregar Planta Baixa
+                        </Button>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handleUpload} 
+                            accept="image/*" 
+                            className="hidden" 
+                        />
+                    </div>
+                ) : (
+                    <div className="overflow-auto w-full h-full p-4 flex items-start justify-center cursor-move" style={{ maxHeight: '80vh' }}>
+                        <img 
+                            src={floorPlanImage} 
+                            alt="Planta Baixa" 
+                            className="transition-transform duration-200 origin-top shadow-xl rounded-lg bg-white"
+                            style={{ transform: `scale(${scale})` }}
+                        />
+                    </div>
+                )}
+            </Card>
+            
+            {floorPlanImage && (
+                <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm flex items-center gap-3 border border-blue-100">
+                    <Info size={20} />
+                    <span>Esta imagem está salva no seu navegador e será incluída no backup de dados.</span>
+                </div>
+            )}
+        </div>
     );
   };
 
@@ -1305,7 +1659,7 @@ export default function App() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {rooms.map((room) => {
           const { floorArea, wallAreaNet } = getRoomDimensions(room);
           const isHighlighted = highlightedRoomId === room.id;
@@ -1316,173 +1670,225 @@ export default function App() {
               key={room.id} 
               id={`room-card-${room.id}`}
               onClick={() => setHighlightedRoomId(room.id)}
-              className={`overflow-hidden scroll-mt-48 transition-all duration-500 ${isHighlighted ? 'ring-2 ring-blue-500 shadow-xl scale-[1.01]' : ''}`}
+              className={`overflow-hidden scroll-mt-48 transition-all duration-500 hover:shadow-lg border border-transparent hover:border-slate-200 ${isHighlighted ? 'ring-2 ring-blue-500 shadow-xl scale-[1.01]' : ''}`}
             >
-              {/* Header */}
-              <div className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 p-6 flex flex-wrap gap-6 justify-between items-start">
-                <div className="flex items-start gap-6 flex-1 flex-wrap">
-                  <div className="w-full md:w-1/3 min-w-[200px]">
-                    <label className={STYLES.label}>Nome do Ambiente</label>
+              {/* Compact Header */}
+              <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/50 to-white">
+                  <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
                     <input 
-                      type="text" 
-                      value={room.name}
-                      onChange={(e) => updateRoom(room.id, 'name', e.target.value)}
-                      className={`${STYLES.input} font-semibold text-lg`}
+                        type="text" 
+                        value={room.name}
+                        onChange={(e) => updateRoom(room.id, 'name', e.target.value)}
+                        className="bg-transparent font-bold text-slate-800 text-base focus:bg-white focus:ring-2 focus:ring-blue-100 rounded px-1.5 py-0.5 -ml-1.5 w-full sm:w-auto min-w-[150px] transition-all"
+                        placeholder="Nome do Ambiente"
                     />
-                  </div>
-                  <div className="w-32">
-                     <label className={STYLES.label}>Piso</label>
                      <select 
                       value={room.type}
                       onChange={(e) => updateRoom(room.id, 'type', e.target.value)}
-                      className={STYLES.input}
+                      className="bg-slate-100 text-[10px] text-slate-500 font-bold uppercase tracking-wider rounded-md px-2 py-1 border-none focus:ring-0 cursor-pointer hover:bg-slate-200 w-fit"
                      >
                        <option value="subsolo">Subsolo</option>
                        <option value="terreo">Térreo</option>
                        <option value="superior">Superior</option>
                      </select>
                   </div>
-                </div>
-                 
-                 <div className="flex flex-col items-end gap-2">
-                    <div className="flex flex-col items-end justify-center bg-emerald-50 border border-emerald-100 rounded-xl px-5 py-2 min-w-[160px]">
-                        <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Total Estimado</span>
-                        <span className="text-xl font-bold text-emerald-700">
+
+                  <div className="flex items-center gap-4">
+                     <div className="text-right bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100/50">
+                        <span className="block text-[9px] text-emerald-600/70 font-bold uppercase tracking-widest">Custo Est.</span>
+                        <span className="text-sm font-black text-emerald-600 leading-none">
                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(roomTotal)}
                         </span>
+                     </div>
+                     <button onClick={() => deleteRoom(room.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-full">
+                        <Trash2 size={16} />
+                     </button>
+                  </div>
+              </div>
+
+              {/* Symmetrical Dimensions Grid */}
+              <div className="p-5 border-b border-slate-100">
+                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                    {/* Field 1: Largura */}
+                    <div>
+                        <label className={STYLES.labelCompact}>Largura</label>
+                        <div className="relative">
+                            <input 
+                                type="number" step="0.05" 
+                                value={room.width} 
+                                onChange={(e) => updateRoom(room.id, 'width', parseFloat(e.target.value))} 
+                                className={STYLES.inputCompact}
+                            />
+                            <span className="absolute right-3 top-1.5 text-xs text-slate-400 font-medium pointer-events-none">m</span>
+                        </div>
                     </div>
-                     <Button variant="ghost" onClick={() => deleteRoom(room.id)} className="text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 h-auto">
-                        <Trash2 size={14} className="mr-1" /> Excluir
-                    </Button>
+                    
+                    {/* Field 2: Comprimento */}
+                    <div>
+                        <label className={STYLES.labelCompact}>Comprimento</label>
+                        <div className="relative">
+                            <input 
+                                type="number" step="0.05" 
+                                value={room.length} 
+                                onChange={(e) => updateRoom(room.id, 'length', parseFloat(e.target.value))} 
+                                className={STYLES.inputCompact}
+                            />
+                            <span className="absolute right-3 top-1.5 text-xs text-slate-400 font-medium pointer-events-none">m</span>
+                        </div>
+                    </div>
+
+                    {/* Field 3: Pé Direito */}
+                    <div>
+                        <label className={STYLES.labelCompact}>Pé Direito</label>
+                        <div className="relative">
+                            <input 
+                                type="number" step="0.05" 
+                                value={room.height} 
+                                onChange={(e) => updateRoom(room.id, 'height', parseFloat(e.target.value))} 
+                                className={STYLES.inputCompact}
+                            />
+                            <span className="absolute right-3 top-1.5 text-xs text-slate-400 font-medium pointer-events-none">m</span>
+                        </div>
+                    </div>
+
+                    {/* Field 4: Vãos */}
+                    <div>
+                        <label className={STYLES.labelCompact}>Desc. Vãos</label>
+                        <div className="relative">
+                            <input 
+                                type="number" step="0.01" 
+                                value={room.deductionArea} 
+                                onChange={(e) => updateRoom(room.id, 'deductionArea', parseFloat(e.target.value))} 
+                                className={`${STYLES.inputCompact} text-slate-500`}
+                            />
+                            <span className="absolute right-3 top-1.5 text-xs text-slate-400 font-medium pointer-events-none">m²</span>
+                        </div>
+                    </div>
+
+                    {/* Field 5: Interruptores */}
+                    <div className="relative group">
+                        <label className={`${STYLES.labelCompact} flex items-center gap-1 text-yellow-600/80`}>
+                            <Zap size={10} className="fill-yellow-500 text-yellow-500" /> Interruptores
+                        </label>
+                        <input 
+                            type="number" min="0" 
+                            value={room.switchCount} 
+                            onChange={(e) => updateRoom(room.id, 'switchCount', parseInt(e.target.value) || 0)} 
+                            className={`${STYLES.inputCompact} border-yellow-200 focus:border-yellow-400 focus:ring-yellow-100`}
+                        />
+                        <div className="absolute -top-1 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                             <TaskCostDisplay room={room} taskKey="switchCount" unitPrices={unitPrices} fixedCosts={fixedCosts} />
+                        </div>
+                    </div>
+
+                    {/* Field 6: Tomadas */}
+                    <div className="relative group">
+                        <label className={`${STYLES.labelCompact} flex items-center gap-1 text-yellow-600/80`}>
+                            <Plug size={10} className="text-yellow-600" /> Tomadas
+                        </label>
+                        <input 
+                            type="number" min="0" 
+                            value={room.socketCount} 
+                            onChange={(e) => updateRoom(room.id, 'socketCount', parseInt(e.target.value) || 0)} 
+                            className={`${STYLES.inputCompact} border-yellow-200 focus:border-yellow-400 focus:ring-yellow-100`}
+                        />
+                        <div className="absolute -top-1 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                             <TaskCostDisplay room={room} taskKey="socketCount" unitPrices={unitPrices} fixedCosts={fixedCosts} />
+                        </div>
+                    </div>
+                 </div>
+
+                 {/* Calculated Areas Footer */}
+                 <div className="mt-4 pt-3 border-t border-dashed border-slate-100 flex items-center justify-end gap-6 text-[11px] text-slate-400">
+                    <div className="flex items-center gap-1.5" title="Área de Piso = Largura x Comprimento">
+                        <BoxSelect size={12} className="text-slate-300" />
+                        <span>Piso: <strong className="text-slate-600">{floorArea.toFixed(2)} m²</strong></span>
+                    </div>
+                    <div className="flex items-center gap-1.5" title="Área de Parede = (Perímetro x Altura) - Vãos">
+                        <Maximize2 size={12} className="text-slate-300" />
+                        <span>Parede: <strong className="text-slate-600">{wallAreaNet.toFixed(2)} m²</strong></span>
+                    </div>
                  </div>
               </div>
 
-              {/* Dimensions */}
-              <div className="p-6 bg-white grid grid-cols-2 md:grid-cols-5 gap-6 border-b border-slate-100">
-                <div>
-                   <label className={STYLES.label}>Largura (m)</label>
-                   <input type="number" step="0.05" value={room.width} onChange={(e) => updateRoom(room.id, 'width', parseFloat(e.target.value))} className={STYLES.inputSmall} />
-                </div>
-                <div>
-                   <label className={STYLES.label}>Comprimento (m)</label>
-                   <input type="number" step="0.05" value={room.length} onChange={(e) => updateRoom(room.id, 'length', parseFloat(e.target.value))} className={STYLES.inputSmall} />
-                </div>
-                <div>
-                   <label className={STYLES.label}>Pé Direito (m)</label>
-                   <input type="number" step="0.05" value={room.height} onChange={(e) => updateRoom(room.id, 'height', parseFloat(e.target.value))} className={STYLES.inputSmall} />
-                </div>
-                <div>
-                   <label className={STYLES.label}>Desc. Vãos (m²)</label>
-                   <input type="number" step="0.01" value={room.deductionArea} onChange={(e) => updateRoom(room.id, 'deductionArea', parseFloat(e.target.value))} className={STYLES.inputSmall} />
-                </div>
-                <div className="flex flex-col justify-center text-xs text-slate-500 bg-slate-50 rounded-lg px-3 border border-slate-100">
-                  <div className="flex justify-between py-1 border-b border-slate-200/50"><span>Área Piso:</span> <strong>{floorArea.toFixed(2)} m²</strong></div>
-                  <div className="flex justify-between py-1"><span>Área Parede:</span> <strong>{wallAreaNet.toFixed(2)} m²</strong></div>
-                </div>
-              </div>
-
-              {/* Electrical Counts (New) */}
-              <div className="px-6 py-4 bg-slate-50/50 grid grid-cols-1 sm:grid-cols-2 gap-8 border-b border-slate-100">
-                <div className="flex items-center gap-4 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                   <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 font-bold text-xs">
-                        INT
-                   </div>
-                   <div className="flex-1">
-                        <label className="text-xs font-bold text-slate-700 uppercase">Interruptores</label>
-                        <TaskCostDisplay room={room} taskKey="switchCount" unitPrices={unitPrices} fixedCosts={fixedCosts} />
-                   </div>
-                   <input 
-                     type="number" 
-                     min="0" 
-                     value={room.switchCount} 
-                     onChange={(e) => updateRoom(room.id, 'switchCount', parseInt(e.target.value) || 0)} 
-                     className="w-16 border border-slate-200 rounded p-1 text-sm text-center focus:ring-2 focus:ring-yellow-400 outline-none" 
-                   />
-                </div>
-                <div className="flex items-center gap-4 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                    <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 font-bold text-xs">
-                        TOM
-                   </div>
-                   <div className="flex-1">
-                        <label className="text-xs font-bold text-slate-700 uppercase">Tomadas</label>
-                        <TaskCostDisplay room={room} taskKey="socketCount" unitPrices={unitPrices} fixedCosts={fixedCosts} />
-                   </div>
-                   <input 
-                     type="number" 
-                     min="0"
-                     value={room.socketCount} 
-                     onChange={(e) => updateRoom(room.id, 'socketCount', parseInt(e.target.value) || 0)} 
-                     className="w-16 border border-slate-200 rounded p-1 text-sm text-center focus:ring-2 focus:ring-yellow-400 outline-none" 
-                   />
-                </div>
-              </div>
-
-              {/* Tasks */}
-              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Task Groups */}
+              <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 bg-white">
                 
-                {/* Demolition Column */}
-                <div>
-                  <h5 className="text-xs font-bold text-rose-500 mb-4 uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-rose-500"></div> Demolição
+                {/* Group: Demolition */}
+                <div className="bg-slate-50/50 rounded-xl border border-slate-100 p-3 flex flex-col gap-2">
+                  <h5 className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-1 px-1">
+                    Demolição
                   </h5>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {[
-                        { key: 'demo_floor', label: 'Demolição Piso' },
-                        { key: 'demo_wall', label: 'Demolição Parede' },
-                        { key: 'demo_ceiling', label: 'Demolição Teto' }
+                        { key: 'demo_floor', label: 'Piso' },
+                        { key: 'demo_wall', label: 'Parede' },
+                        { key: 'demo_ceiling', label: 'Teto' }
                     ].map(task => (
-                        <label key={task.key} className="flex items-center gap-3 cursor-pointer hover:bg-rose-50/50 p-2 rounded-lg transition-colors group">
-                            <input type="checkbox" checked={room.tasks[task.key as keyof typeof room.tasks]} onChange={(e) => updateRoomTask(room.id, task.key as keyof Room['tasks'], e.target.checked)} 
-                            className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-gray-300" />
-                            <span className="text-sm text-slate-600 font-medium group-hover:text-rose-700">{task.label}</span>
+                        <label key={task.key} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 shadow-sm hover:border-rose-300 cursor-pointer transition-all group">
+                            <div className="flex items-center gap-3">
+                                <div className="relative flex items-center justify-center">
+                                    <input type="checkbox" checked={room.tasks[task.key as keyof typeof room.tasks]} onChange={(e) => updateRoomTask(room.id, task.key as keyof Room['tasks'], e.target.checked)} 
+                                    className="peer appearance-none w-4 h-4 rounded border border-slate-300 checked:bg-rose-500 checked:border-rose-500 transition-colors cursor-pointer" />
+                                    <svg className="absolute w-2.5 h-2.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                                <span className="text-xs font-medium text-slate-600 group-hover:text-rose-600 transition-colors">{task.label}</span>
+                            </div>
                             <TaskCostDisplay room={room} taskKey={task.key} unitPrices={unitPrices} fixedCosts={fixedCosts} />
                         </label>
                     ))}
                   </div>
                 </div>
 
-                {/* Refinishing Floor/Ceiling */}
-                <div>
-                  <h5 className="text-xs font-bold text-blue-500 mb-4 uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div> Piso & Teto
+                {/* Group: Floor/Ceiling */}
+                <div className="bg-slate-50/50 rounded-xl border border-slate-100 p-3 flex flex-col gap-2">
+                  <h5 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1 px-1">
+                    Piso & Teto
                   </h5>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {[
                         { key: 'ref_floor_screed', label: 'Contrapiso' },
-                        { key: 'ref_floor_ceramic', label: 'Cerâmica Piso' },
-                        { key: 'ref_ceiling_gypsum', label: 'Gesso (Teto)' },
+                        { key: 'ref_floor_ceramic', label: 'Cerâmica' },
+                        { key: 'ref_ceiling_gypsum', label: 'Gesso' },
                         { key: 'ref_ceiling_plaster', label: 'Reboco Teto' },
                         { key: 'ref_ceiling_paint', label: 'Pintura Teto' },
                         { key: 'ref_ceiling_pvc', label: 'Forro PVC' },
-                    ].map((task, idx) => (
-                         <React.Fragment key={task.key}>
-                            {idx === 2 && <div className="h-px bg-slate-100 my-2"></div>}
-                            <label className="flex items-center gap-3 cursor-pointer hover:bg-blue-50/50 p-2 rounded-lg transition-colors group">
-                                <input type="checkbox" checked={room.tasks[task.key as keyof typeof room.tasks]} onChange={(e) => updateRoomTask(room.id, task.key as keyof Room['tasks'], e.target.checked)} 
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300" />
-                                <span className="text-sm text-slate-600 font-medium group-hover:text-blue-700">{task.label}</span>
-                                <TaskCostDisplay room={room} taskKey={task.key} unitPrices={unitPrices} fixedCosts={fixedCosts} />
-                            </label>
-                        </React.Fragment>
+                    ].map((task) => (
+                        <label key={task.key} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 shadow-sm hover:border-blue-300 cursor-pointer transition-all group">
+                             <div className="flex items-center gap-3">
+                                <div className="relative flex items-center justify-center">
+                                    <input type="checkbox" checked={room.tasks[task.key as keyof typeof room.tasks]} onChange={(e) => updateRoomTask(room.id, task.key as keyof Room['tasks'], e.target.checked)} 
+                                    className="peer appearance-none w-4 h-4 rounded border border-slate-300 checked:bg-blue-500 checked:border-blue-500 transition-colors cursor-pointer" />
+                                    <svg className="absolute w-2.5 h-2.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                                <span className="text-xs font-medium text-slate-600 group-hover:text-blue-600 transition-colors truncate max-w-[80px]">{task.label}</span>
+                            </div>
+                            <TaskCostDisplay room={room} taskKey={task.key} unitPrices={unitPrices} fixedCosts={fixedCosts} />
+                        </label>
                     ))}
                   </div>
                 </div>
 
-                {/* Refinishing Wall */}
-                <div>
-                  <h5 className="text-xs font-bold text-orange-500 mb-4 uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-orange-500"></div> Paredes
+                {/* Group: Walls */}
+                <div className="bg-slate-50/50 rounded-xl border border-slate-100 p-3 flex flex-col gap-2">
+                  <h5 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-1 px-1">
+                    Paredes
                   </h5>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                      {[
-                        { key: 'ref_wall_plaster', label: 'Reboco Parede' },
-                        { key: 'ref_wall_ceramic', label: 'Cerâmica Parede' },
-                        { key: 'ref_wall_paint', label: 'Pintura Parede' },
+                        { key: 'ref_wall_plaster', label: 'Reboco' },
+                        { key: 'ref_wall_ceramic', label: 'Cerâmica' },
+                        { key: 'ref_wall_paint', label: 'Pintura' },
                     ].map(task => (
-                        <label key={task.key} className="flex items-center gap-3 cursor-pointer hover:bg-orange-50/50 p-2 rounded-lg transition-colors group">
-                            <input type="checkbox" checked={room.tasks[task.key as keyof typeof room.tasks]} onChange={(e) => updateRoomTask(room.id, task.key as keyof Room['tasks'], e.target.checked)} 
-                            className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-gray-300" />
-                            <span className="text-sm text-slate-600 font-medium group-hover:text-orange-700">{task.label}</span>
+                        <label key={task.key} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 shadow-sm hover:border-orange-300 cursor-pointer transition-all group">
+                            <div className="flex items-center gap-3">
+                                <div className="relative flex items-center justify-center">
+                                    <input type="checkbox" checked={room.tasks[task.key as keyof typeof room.tasks]} onChange={(e) => updateRoomTask(room.id, task.key as keyof Room['tasks'], e.target.checked)} 
+                                    className="peer appearance-none w-4 h-4 rounded border border-slate-300 checked:bg-orange-500 checked:border-orange-500 transition-colors cursor-pointer" />
+                                    <svg className="absolute w-2.5 h-2.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                                <span className="text-xs font-medium text-slate-600 group-hover:text-orange-600 transition-colors">{task.label}</span>
+                            </div>
                             <TaskCostDisplay room={room} taskKey={task.key} unitPrices={unitPrices} fixedCosts={fixedCosts} />
                         </label>
                     ))}
@@ -1641,134 +2047,79 @@ export default function App() {
     </div>
   );
 
+  const NavItem = ({ icon: Icon, label, active, onClick }: any) => (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group ${
+        active 
+          ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
+          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+      }`}
+    >
+      <Icon size={20} className={active ? 'text-white' : 'text-slate-500 group-hover:text-white transition-colors'} />
+      <span className="hidden lg:inline font-medium text-sm">{label}</span>
+    </button>
+  );
+
   return (
-    <div className="h-screen overflow-hidden bg-slate-100 font-sans text-slate-900 flex flex-col md:flex-row selection:bg-blue-100 selection:text-blue-900">
-      {/* Sidebar Navigation */}
-      <aside className="bg-slate-900 text-white w-full md:w-72 flex-shrink-0 flex flex-col shadow-2xl z-20">
-        <div className="p-8 border-b border-slate-800/50 bg-gradient-to-b from-slate-800 to-slate-900">
-          <h1 className="text-xl font-black flex items-center gap-3 tracking-tight">
-            <div className="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-900/50">
-                <LayoutDashboard className="text-white" size={20} />
-            </div>
-            ReformaCalc <span className="text-blue-500 font-light">Pro</span>
-          </h1>
-        </div>
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
-          <div className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-2">Planejamento</div>
-          <button 
-            onClick={() => setActiveTab('meeting')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm group ${activeTab === 'meeting' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-          >
-            <Users size={18} className={activeTab === 'meeting' ? 'text-white' : 'text-slate-500 group-hover:text-white'} />
-            Sugestão Reunião
-          </button>
-          <button 
-            onClick={() => setActiveTab('prices')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm group ${activeTab === 'prices' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-          >
-            <DollarSign size={18} className={activeTab === 'prices' ? 'text-white' : 'text-slate-500 group-hover:text-white'} />
-            Tabela de Preços
-          </button>
-
-          <div className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-6">Projeto</div>
-          <button 
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm group ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-          >
-            <Home size={18} className={activeTab === 'dashboard' ? 'text-white' : 'text-slate-500 group-hover:text-white'} />
-            Dashboard Geral
-          </button>
-          <button 
-            onClick={() => setActiveTab('rooms')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm group ${activeTab === 'rooms' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-          >
-            <Calculator size={18} className={activeTab === 'rooms' ? 'text-white' : 'text-slate-500 group-hover:text-white'} />
-            Ambientes
-          </button>
-          
-           <div className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-6">Relatórios</div>
-          <button 
-            onClick={() => setActiveTab('schedule')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm group ${activeTab === 'schedule' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-          >
-            <Calendar size={18} className={activeTab === 'schedule' ? 'text-white' : 'text-slate-500 group-hover:text-white'} />
-            Cronograma
-          </button>
-          <button 
-            onClick={() => setActiveTab('synthesis')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm group ${activeTab === 'synthesis' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-          >
-            <FileText size={18} className={activeTab === 'synthesis' ? 'text-white' : 'text-slate-500 group-hover:text-white'} />
-            Síntese Legendada
-          </button>
-        </nav>
-        
-        {/* Data Management Section in Sidebar */}
-        <div className="p-4 bg-slate-950">
-          <div className="space-y-2">
-            <button onClick={handleExportData} className="w-full flex items-center gap-3 px-4 py-2 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
-              <Download size={14} />
-              Backup Dados
-            </button>
-            <button onClick={handleImportClick} className="w-full flex items-center gap-3 px-4 py-2 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
-              <Upload size={14} />
-              Restaurar
-            </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileChange} 
-              accept=".json" 
-              className="hidden" 
-            />
-            <button onClick={handleResetData} className="w-full flex items-center gap-3 px-4 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-lg transition-colors mt-2">
-              <RefreshCcw size={14} />
-              Resetar Tudo
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600 text-center font-mono">
-          v1.4.0 • Design Refresh
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-slate-100 scroll-smooth">
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-8 py-5 sticky top-0 z-30 flex justify-between items-center shadow-sm">
-             <div>
-                <h2 className="text-xl font-bold text-slate-800 capitalize tracking-tight flex items-center gap-2">
-                    {activeTab === 'prices' ? 'Tabela de Preços' : 
-                        activeTab === 'synthesis' ? 'Síntese Legendada' : 
-                        activeTab === 'meeting' ? 'Sugestão para Reunião' : 
-                        activeTab === 'schedule' ? 'Cronograma Estimado' :
-                        activeTab === 'rooms' ? 'Gerenciador de Ambientes' :
-                        'Dashboard Geral'}
-                </h2>
-             </div>
-             <div className="flex items-center gap-6">
-                <div className="text-right hidden sm:block">
-                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-0.5">Custo Total Estimado</p>
-                  <p className="text-2xl font-black text-slate-800 leading-none">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(calculations.grandTotal)}
-                  </p>
+    <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
+        <aside className="w-20 lg:w-64 bg-slate-900 text-slate-300 flex flex-col fixed h-full z-50 transition-all duration-300">
+            {/* Header */}
+            <div className="h-20 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-800">
+                <div className="bg-blue-600 p-2 rounded-lg">
+                    <Home className="text-white" size={24} />
                 </div>
-                <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
-                <button onClick={handleExportData} title="Salvar Backup" className="p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-600 hover:text-white transition-all shadow-sm hover:shadow-blue-200">
-                  <Save size={20} />
-                </button>
-             </div>
-        </header>
+                <span className="ml-3 font-bold text-white text-lg hidden lg:block tracking-tight">Reforma<span className="text-blue-500">Calc</span></span>
+            </div>
 
-        <div className="p-6 md:p-10 max-w-[1600px] mx-auto">
-          {activeTab === 'dashboard' && DashboardView()}
-          {activeTab === 'rooms' && RoomsView()}
-          {activeTab === 'synthesis' && SynthesisView()}
-          {activeTab === 'prices' && PricesView()}
-          {activeTab === 'meeting' && MeetingView()}
-          {activeTab === 'schedule' && ScheduleView()}
-        </div>
-      </main>
+            {/* Nav */}
+            <nav className="flex-1 py-6 flex flex-col gap-2 px-3">
+                <NavItem icon={LayoutDashboard} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+                <NavItem icon={BoxSelect} label="Ambientes" active={activeTab === 'rooms'} onClick={() => setActiveTab('rooms')} />
+                <NavItem icon={DollarSign} label="Custos" active={activeTab === 'prices'} onClick={() => setActiveTab('prices')} />
+                <NavItem icon={Calendar} label="Cronograma" active={activeTab === 'schedule'} onClick={() => setActiveTab('schedule')} />
+                <NavItem icon={MapIcon} label="Planta Baixa" active={activeTab === 'floorplan'} onClick={() => setActiveTab('floorplan')} />
+                <NavItem icon={FileText} label="Síntese" active={activeTab === 'synthesis'} onClick={() => setActiveTab('synthesis')} />
+            </nav>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-800 space-y-2">
+                <button onClick={handleExportData} className="w-full flex items-center justify-center lg:justify-start gap-3 p-2 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-white" title="Exportar Backup">
+                    <Download size={20} />
+                    <span className="hidden lg:inline text-sm font-medium">Backup</span>
+                </button>
+                <button onClick={handleImportClick} className="w-full flex items-center justify-center lg:justify-start gap-3 p-2 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-white" title="Importar Backup">
+                    <Upload size={20} />
+                    <span className="hidden lg:inline text-sm font-medium">Restaurar</span>
+                </button>
+                <button onClick={handleResetData} className="w-full flex items-center justify-center lg:justify-start gap-3 p-2 rounded-lg hover:bg-red-900/30 text-slate-500 hover:text-red-400 transition-colors" title="Resetar Dados">
+                    <RefreshCcw size={20} />
+                    <span className="hidden lg:inline text-sm font-medium">Resetar</span>
+                </button>
+            </div>
+        </aside>
+
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
+
+        <main className="flex-1 ml-20 lg:ml-64 p-4 md:p-8 overflow-x-hidden">
+            <div className="max-w-7xl mx-auto">
+                {activeTab === 'dashboard' && <DashboardView />}
+                {activeTab === 'rooms' && <RoomsView />}
+                {activeTab === 'prices' && <PricesView />}
+                {activeTab === 'schedule' && <ScheduleView />}
+                {activeTab === 'synthesis' && <SynthesisView />}
+                {activeTab === 'floorplan' && <FloorPlanView />}
+            </div>
+        </main>
+
+        {editingTask && (
+            <EditTaskModal 
+                task={editingTask} 
+                availableDeps={getAvailableDependencies(editingTask.id)} 
+                onClose={() => setEditingTask(null)} 
+                onSave={saveTaskChanges} 
+            />
+        )}
     </div>
   );
 }
