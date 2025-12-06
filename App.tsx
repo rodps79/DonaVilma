@@ -68,7 +68,7 @@ const Button = ({ onClick, children, variant = 'primary', className = "" }: any)
 // Moved outside App to prevent re-creation on every render
 const TaskCostDisplay: React.FC<{ 
   room: Room; 
-  taskKey: keyof Room['tasks'] | 'switchCount' | 'socketCount';
+  taskKey: string;
   unitPrices: UnitPrice[];
   fixedCosts: FixedCost[];
 }> = ({ room, taskKey, unitPrices, fixedCosts }) => {
@@ -93,10 +93,10 @@ const TaskCostDisplay: React.FC<{
   let quantity = 0;
   if (taskKey === 'switchCount') quantity = room.switchCount;
   else if (taskKey === 'socketCount') quantity = room.socketCount;
-  else {
-    // If checkbox is not checked, return null (hide discreet text)
-    // @ts-ignore
-    if (!room.tasks[taskKey]) return null;
+  else if (taskKey in room.tasks) {
+    // Type-safe check
+    const taskKeyTyped = taskKey as keyof Room['tasks'];
+    if (!room.tasks[taskKeyTyped]) return null;
     
     if (taskKey.includes('floor')) quantity = floorArea;
     else if (taskKey.includes('wall')) quantity = wallAreaNet;
@@ -129,18 +129,30 @@ export default function App() {
   
   // --- Initialize State from LocalStorage or Constants ---
   const [rooms, setRooms] = useState<Room[]>(() => {
-    const saved = localStorage.getItem('reforma_rooms');
-    return saved ? JSON.parse(saved) : INITIAL_ROOMS;
+    try {
+      const saved = localStorage.getItem('reforma_rooms');
+      return saved ? JSON.parse(saved) : INITIAL_ROOMS;
+    } catch {
+      return INITIAL_ROOMS;
+    }
   });
 
   const [unitPrices, setUnitPrices] = useState<UnitPrice[]>(() => {
-    const saved = localStorage.getItem('reforma_prices');
-    return saved ? JSON.parse(saved) : INITIAL_PRICES;
+    try {
+      const saved = localStorage.getItem('reforma_prices');
+      return saved ? JSON.parse(saved) : INITIAL_PRICES;
+    } catch {
+      return INITIAL_PRICES;
+    }
   });
 
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>(() => {
-    const saved = localStorage.getItem('reforma_costs');
-    return saved ? JSON.parse(saved) : INITIAL_FIXED_COSTS;
+    try {
+      const saved = localStorage.getItem('reforma_costs');
+      return saved ? JSON.parse(saved) : INITIAL_FIXED_COSTS;
+    } catch {
+      return INITIAL_FIXED_COSTS;
+    }
   });
 
   const [highlightedRoomId, setHighlightedRoomId] = useState<string | null>(null);
@@ -271,7 +283,8 @@ export default function App() {
         }
 
         // It's a boolean task key
-        isActive = room.tasks[price.applyTo as keyof Room['tasks']];
+        // @ts-ignore
+        isActive = room.tasks[price.applyTo];
         if (isActive) {
             if (price.applyTo.includes('floor')) quantity = floorArea;
             else if (price.applyTo.includes('wall')) quantity = wallAreaNet;
@@ -468,7 +481,8 @@ export default function App() {
       tasks.push({ id: 'finish', name: '9. Acabamentos Finais', startDay: endPainting, duration: Math.max(1, elecFinDuration), color: 'bg-purple-500', dependency: 'painting' });
     }
 
-    const totalDays = Math.max(...tasks.map(t => t.startDay + t.duration), 0) + 2; 
+    const maxDay = Math.max(...tasks.map(t => t.startDay + t.duration), 0);
+    const totalDays = maxDay > 0 ? maxDay + 2 : 0; // buffer only if there are tasks
 
     return { tasks, totalDays };
   }, [rooms, fixedCosts]);
@@ -488,7 +502,8 @@ export default function App() {
         return;
       }
 
-      isActive = room.tasks[price.applyTo as keyof Room['tasks']];
+      // @ts-ignore
+      isActive = room.tasks[price.applyTo];
       if (isActive) {
           if (price.applyTo.includes('floor')) quantity = floorArea;
           else if (price.applyTo.includes('wall')) quantity = wallAreaNet;
@@ -596,8 +611,8 @@ export default function App() {
             </div>
              <div className="text-right bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
                 <p className="text-xs text-blue-600 uppercase font-bold tracking-wider">Prazo Total</p>
-                <p className="text-2xl font-bold text-slate-800">{totalDays - 2} Dias Úteis</p>
-                <p className="text-xs text-slate-500">~{Math.ceil((totalDays - 2) / 5)} Semanas</p>
+                <p className="text-2xl font-bold text-slate-800">{Math.max(0, totalDays - 2)} Dias Úteis</p>
+                <p className="text-xs text-slate-500">~{Math.ceil((Math.max(0, totalDays - 2)) / 5)} Semanas</p>
              </div>
           </div>
 
@@ -610,7 +625,7 @@ export default function App() {
                   ATIVIDADE / FASE
                 </div>
                 <div className="flex-1 flex relative h-10">
-                  {Array.from({ length: totalDays }).map((_, i) => (
+                  {totalDays > 0 && Array.from({ length: totalDays }).map((_, i) => (
                     (i % 5 === 0 || i === 0) && (
                       <div key={i} className="absolute text-[10px] text-slate-400 border-l border-slate-200 pl-1 h-full flex items-center" style={{ left: `${(i / totalDays) * 100}%` }}>
                         Dia {i + 1}
@@ -623,8 +638,8 @@ export default function App() {
               {/* Rows */}
               <div className="divide-y divide-slate-100">
                 {tasks.map(task => {
-                  const leftPercent = (task.startDay / totalDays) * 100;
-                  const widthPercent = (task.duration / totalDays) * 100;
+                  const leftPercent = totalDays > 0 ? (task.startDay / totalDays) * 100 : 0;
+                  const widthPercent = totalDays > 0 ? (task.duration / totalDays) * 100 : 0;
                   
                   return (
                     <div key={task.id} className="flex hover:bg-slate-50 group">
@@ -633,7 +648,7 @@ export default function App() {
                        </div>
                        <div className="flex-1 relative h-12 my-auto">
                           {/* Grid Lines */}
-                          {Array.from({ length: Math.ceil(totalDays / 5) }).map((_, i) => (
+                          {totalDays > 0 && Array.from({ length: Math.ceil(totalDays / 5) }).map((_, i) => (
                              <div key={i} className="absolute h-full border-r border-slate-100 border-dashed" style={{ left: `${((i * 5) / totalDays) * 100}%` }}></div>
                           ))}
                           
@@ -1057,7 +1072,8 @@ export default function App() {
           return;
         }
 
-        isActive = room.tasks[price.applyTo as keyof Room['tasks']];
+        // @ts-ignore
+        isActive = room.tasks[price.applyTo];
         if (isActive) {
             if (price.applyTo.includes('floor')) quantity = floorArea;
             else if (price.applyTo.includes('wall')) quantity = wallAreaNet;
