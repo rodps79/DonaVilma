@@ -617,57 +617,64 @@ export default function App() {
           </div>
 
           {/* Gantt Chart Container */}
-          <div className="overflow-x-auto border border-slate-200 rounded-lg pb-4">
-            <div className="min-w-[800px] relative">
-              {/* Header Days */}
-              <div className="flex border-b border-slate-200 bg-slate-50 sticky left-0">
-                <div className="w-64 flex-shrink-0 p-3 text-xs font-bold text-slate-500 border-r border-slate-200 bg-slate-50 sticky left-0 z-10">
-                  ATIVIDADE / FASE
+          {tasks.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-lg border-2 border-dashed border-slate-200">
+              <p>Nenhuma atividade geradora de cronograma encontrada.</p>
+              <p className="text-sm mt-2">Adicione ambientes e marque tarefas (demolição, revestimentos, etc.) para gerar o cronograma.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-slate-200 rounded-lg pb-4">
+              <div className="min-w-[800px] relative">
+                {/* Header Days */}
+                <div className="flex border-b border-slate-200 bg-slate-50 sticky left-0">
+                  <div className="w-64 flex-shrink-0 p-3 text-xs font-bold text-slate-500 border-r border-slate-200 bg-slate-50 sticky left-0 z-10">
+                    ATIVIDADE / FASE
+                  </div>
+                  <div className="flex-1 flex relative h-10">
+                    {totalDays > 0 && Array.from({ length: totalDays }).map((_, i) => (
+                      (i % 5 === 0 || i === 0) && (
+                        <div key={i} className="absolute text-[10px] text-slate-400 border-l border-slate-200 pl-1 h-full flex items-center" style={{ left: `${(i / totalDays) * 100}%` }}>
+                          Dia {i + 1}
+                        </div>
+                      )
+                    ))}
+                  </div>
                 </div>
-                <div className="flex-1 flex relative h-10">
-                  {totalDays > 0 && Array.from({ length: totalDays }).map((_, i) => (
-                    (i % 5 === 0 || i === 0) && (
-                      <div key={i} className="absolute text-[10px] text-slate-400 border-l border-slate-200 pl-1 h-full flex items-center" style={{ left: `${(i / totalDays) * 100}%` }}>
-                        Dia {i + 1}
-                      </div>
-                    )
-                  ))}
-                </div>
-              </div>
 
-              {/* Rows */}
-              <div className="divide-y divide-slate-100">
-                {tasks.map(task => {
-                  const leftPercent = totalDays > 0 ? (task.startDay / totalDays) * 100 : 0;
-                  const widthPercent = totalDays > 0 ? (task.duration / totalDays) * 100 : 0;
-                  
-                  return (
-                    <div key={task.id} className="flex hover:bg-slate-50 group">
-                       <div className="w-64 flex-shrink-0 p-3 text-sm font-medium text-slate-700 border-r border-slate-200 bg-white group-hover:bg-slate-50 sticky left-0 z-10 truncate" title={task.name}>
-                         {task.name}
-                       </div>
-                       <div className="flex-1 relative h-12 my-auto">
-                          {/* Grid Lines */}
-                          {totalDays > 0 && Array.from({ length: Math.ceil(totalDays / 5) }).map((_, i) => (
-                             <div key={i} className="absolute h-full border-r border-slate-100 border-dashed" style={{ left: `${((i * 5) / totalDays) * 100}%` }}></div>
-                          ))}
-                          
-                          {/* Bar */}
-                          <div 
-                            className={`absolute top-2 h-8 rounded-md shadow-sm ${task.color} opacity-90 hover:opacity-100 transition-all flex items-center px-2`}
-                            style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
-                          >
-                             <span className="text-[10px] text-white font-bold drop-shadow-md whitespace-nowrap overflow-hidden">
-                               {task.duration}d
-                             </span>
-                          </div>
-                       </div>
-                    </div>
-                  );
-                })}
+                {/* Rows */}
+                <div className="divide-y divide-slate-100">
+                  {tasks.map(task => {
+                    const leftPercent = totalDays > 0 ? (task.startDay / totalDays) * 100 : 0;
+                    const widthPercent = totalDays > 0 ? (task.duration / totalDays) * 100 : 0;
+                    
+                    return (
+                      <div key={task.id} className="flex hover:bg-slate-50 group">
+                        <div className="w-64 flex-shrink-0 p-3 text-sm font-medium text-slate-700 border-r border-slate-200 bg-white group-hover:bg-slate-50 sticky left-0 z-10 truncate" title={task.name}>
+                          {task.name}
+                        </div>
+                        <div className="flex-1 relative h-12 my-auto">
+                            {/* Grid Lines */}
+                            {totalDays > 0 && Array.from({ length: Math.ceil(totalDays / 5) }).map((_, i) => (
+                              <div key={i} className="absolute h-full border-r border-slate-100 border-dashed" style={{ left: `${((i * 5) / totalDays) * 100}%` }}></div>
+                            ))}
+                            
+                            {/* Bar */}
+                            <div 
+                              className={`absolute top-2 h-8 rounded-md shadow-sm ${task.color} opacity-90 hover:opacity-100 transition-all flex items-center px-2`}
+                              style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                            >
+                              <span className="text-[10px] text-white font-bold drop-shadow-md whitespace-nowrap overflow-hidden">
+                                {task.duration}d
+                              </span>
+                            </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+          )}
           
            <div className="mt-6 bg-yellow-50 p-4 rounded-lg text-sm text-yellow-800 border border-yellow-200">
               <strong>Nota:</strong> Este cronograma é gerado automaticamente considerando dependências lógicas (Predecessoras). 
@@ -1648,7 +1655,7 @@ export default function App() {
         </div>
 
         <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
-          v1.1.0
+          v1.2.0 (Fix)
         </div>
       </aside>
 
