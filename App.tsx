@@ -600,7 +600,7 @@ export default function App() {
     const { tasks, totalDays } = scheduleData;
 
     return (
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-6 animate-fade-in" key={activeTab}>
         <Card className="p-6">
           <div className="flex justify-between items-start mb-6">
             <div>
@@ -686,7 +686,7 @@ export default function App() {
   };
 
   const MeetingView = () => (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in" key={activeTab}>
       <Card className="p-8 space-y-8 border-l-4 border-blue-500">
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-blue-700">
@@ -855,7 +855,7 @@ export default function App() {
     const mergedChartData = [...roomCostData, ...fixedCostData].sort((a, b) => b.cost - a.cost);
     
     return (
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-6 animate-fade-in" key={activeTab}>
         {/* Top Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="p-6 border-l-4 border-blue-500">
@@ -1135,7 +1135,7 @@ export default function App() {
     const totalFixedCosts = fixedCosts.reduce((acc, fc) => acc + (fc.quantity * (fc.priceLaborUnit + fc.priceMaterialUnit)), 0);
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" key={activeTab}>
         <h2 className="text-2xl font-bold text-slate-800">Síntese Legendada</h2>
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
@@ -1243,7 +1243,7 @@ export default function App() {
   };
 
   const RoomsView = () => (
-    <div className="space-y-6">
+    <div className="space-y-6" key={activeTab}>
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">Ambientes & Escopo</h2>
         <Button onClick={addRoom}>
@@ -1446,7 +1446,7 @@ export default function App() {
   );
 
   const PricesView = () => (
-    <div className="space-y-8">
+    <div className="space-y-8" key={activeTab}>
       <div>
         <h2 className="text-2xl font-bold text-slate-800 mb-4">Custos Unitários (R$/m²)</h2>
         <Card className="overflow-hidden">
@@ -1576,52 +1576,52 @@ export default function App() {
   return (
     <div className="h-screen overflow-hidden bg-slate-100 font-sans text-slate-900 flex flex-col md:flex-row">
       {/* Sidebar Navigation */}
-      <aside className="bg-slate-900 text-white w-full md:w-64 flex-shrink-0 flex flex-col">
-        <div className="p-6 border-b border-slate-800">
+      <aside className="bg-indigo-900 text-white w-full md:w-64 flex-shrink-0 flex flex-col">
+        <div className="p-6 border-b border-indigo-800">
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <LayoutDashboard className="text-blue-500" />
+            <LayoutDashboard className="text-blue-400" />
             ReformaCalc
           </h1>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           <button 
             onClick={() => setActiveTab('meeting')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'meeting' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'meeting' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-indigo-800 hover:text-white'}`}
           >
             <Users size={20} />
             Sugestão para Reunião
           </button>
           <button 
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'dashboard' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-indigo-800 hover:text-white'}`}
           >
             <Home size={20} />
             Dashboard
           </button>
           <button 
             onClick={() => setActiveTab('rooms')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'rooms' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'rooms' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-indigo-800 hover:text-white'}`}
           >
             <Calculator size={20} />
             Ambientes
           </button>
           <button 
             onClick={() => setActiveTab('schedule')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'schedule' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'schedule' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-indigo-800 hover:text-white'}`}
           >
             <Calendar size={20} />
             Cronograma
           </button>
           <button 
             onClick={() => setActiveTab('synthesis')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'synthesis' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'synthesis' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-indigo-800 hover:text-white'}`}
           >
             <FileText size={20} />
             Síntese
           </button>
           <button 
             onClick={() => setActiveTab('prices')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'prices' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === 'prices' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-indigo-800 hover:text-white'}`}
           >
             <DollarSign size={20} />
             Preços
@@ -1629,14 +1629,14 @@ export default function App() {
         </nav>
         
         {/* Data Management Section in Sidebar */}
-        <div className="p-4 bg-slate-800/50">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Dados</h3>
+        <div className="p-4 bg-indigo-800/50">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Dados</h3>
           <div className="space-y-2">
-            <button onClick={handleExportData} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+            <button onClick={handleExportData} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-indigo-700 rounded transition-colors">
               <Download size={16} />
               Exportar
             </button>
-            <button onClick={handleImportClick} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded transition-colors">
+            <button onClick={handleImportClick} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-indigo-700 rounded transition-colors">
               <Upload size={16} />
               Importar
             </button>
@@ -1647,15 +1647,15 @@ export default function App() {
               accept=".json" 
               className="hidden" 
             />
-            <button onClick={handleResetData} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors">
+            <button onClick={handleResetData} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-300 hover:text-red-200 hover:bg-red-900/30 rounded transition-colors">
               <RefreshCcw size={16} />
               Resetar
             </button>
           </div>
         </div>
 
-        <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
-          v1.2.0 (Fix)
+        <div className="p-4 border-t border-indigo-800 text-xs text-slate-400 text-center">
+          v1.3.0
         </div>
       </aside>
 
