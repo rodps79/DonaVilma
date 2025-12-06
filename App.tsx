@@ -45,7 +45,15 @@ const getRoomDimensions = (room: Room) => {
 
 // --- Helper Components ---
 
-const Card: React.FC<{ children?: React.ReactNode; className?: string; id?: string; style?: React.CSSProperties; onClick?: () => void }> = ({ children, className = "", id, style, onClick }) => (
+interface CardProps {
+  children?: React.ReactNode;
+  className?: string;
+  id?: string;
+  style?: React.CSSProperties;
+  onClick?: () => void;
+}
+
+const Card: React.FC<CardProps> = ({ children, className = "", id, style, onClick }) => (
   <div id={id} className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className}`} style={style} onClick={onClick}>
     {children}
   </div>
@@ -65,13 +73,14 @@ const Button = ({ onClick, children, variant = 'primary', className = "" }: any)
   );
 };
 
-// Moved outside App to prevent re-creation on every render
-const TaskCostDisplay: React.FC<{ 
+interface TaskCostDisplayProps { 
   room: Room; 
   taskKey: string;
   unitPrices: UnitPrice[];
   fixedCosts: FixedCost[];
-}> = ({ room, taskKey, unitPrices, fixedCosts }) => {
+}
+
+const TaskCostDisplay = ({ room, taskKey, unitPrices, fixedCosts }: TaskCostDisplayProps) => {
   const { floorArea, wallAreaNet, ceilingArea } = getRoomDimensions(room);
   
   // Find price in UnitPrices first
@@ -1446,130 +1455,142 @@ export default function App() {
   );
 
   const PricesView = () => (
-    <div className="space-y-8" key={activeTab}>
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-4">Custos Unitários (R$/m²)</h2>
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-slate-600 font-medium uppercase text-xs">
-                <tr>
-                  <th className="px-6 py-3">Categoria</th>
-                  <th className="px-6 py-3">Item</th>
-                  <th className="px-6 py-3 text-right">MO (R$)</th>
-                  <th className="px-6 py-3 text-right">Material (R$)</th>
-                  <th className="px-6 py-3 text-right">Total (R$)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {unitPrices.map((price) => (
-                  <tr key={price.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-3 font-medium text-slate-700">{price.category}</td>
-                    <td className="px-6 py-3">{price.item}</td>
-                    <td className="px-6 py-3 text-right">
-                      <input 
-                        type="number" 
-                        value={price.priceLabor} 
-                        onChange={(e) => updatePrice(price.id, 'priceLabor', parseFloat(e.target.value))}
-                        className="w-24 text-right border border-slate-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                       <input 
-                        type="number" 
-                        value={price.priceMaterial} 
-                        onChange={(e) => updatePrice(price.id, 'priceMaterial', parseFloat(e.target.value))}
-                        className="w-24 text-right border border-slate-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
-                    </td>
-                    <td className="px-6 py-3 text-right font-medium text-slate-800">
-                      {(price.priceLabor + price.priceMaterial).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+    <div className="space-y-6" key={activeTab}>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-slate-800">Tabela de Preços Unitários</h2>
+        <div className="text-sm text-slate-500 bg-blue-50 px-3 py-1 rounded border border-blue-100">
+           Edite os valores abaixo para recalcular todo o orçamento automaticamente.
+        </div>
       </div>
 
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-slate-800">Custos Fixos / Quantidades</h2>
-          <Button onClick={addFixedCost}>
-            <Plus size={20} />
-            Adicionar Custo
-          </Button>
-        </div>
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-slate-600 font-medium uppercase text-xs">
-                <tr>
-                  <th className="px-6 py-3">Item</th>
-                  <th className="px-6 py-3 text-center">Quantidade</th>
-                  <th className="px-6 py-3 text-right">MO Unit. (R$)</th>
-                  <th className="px-6 py-3 text-right">Mat. Unit. (R$)</th>
-                  <th className="px-6 py-3 text-right">Subtotal (R$)</th>
-                  <th className="px-6 py-3"></th>
+      {/* Unit Prices Table */}
+      <Card className="overflow-hidden mb-8">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 text-slate-600 font-medium uppercase text-xs">
+              <tr>
+                <th className="px-6 py-3">Categoria</th>
+                <th className="px-6 py-3">Item</th>
+                <th className="px-6 py-3 text-center">Unidade</th>
+                <th className="px-6 py-3 text-right w-40">Mão de Obra (R$)</th>
+                <th className="px-6 py-3 text-right w-40">Material (R$)</th>
+                <th className="px-6 py-3 text-right w-40">Total (R$)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {unitPrices.map((price) => (
+                <tr key={price.id} className="hover:bg-slate-50">
+                  <td className="px-6 py-3 font-medium text-slate-500">{price.category}</td>
+                  <td className="px-6 py-3 font-medium text-slate-700">{price.item}</td>
+                  <td className="px-6 py-3 text-center text-slate-500">{price.unit}</td>
+                  <td className="px-6 py-3 text-right">
+                    <input
+                      type="number"
+                      step="0.50"
+                      value={price.priceLabor}
+                      onChange={(e) => updatePrice(price.id, 'priceLabor', parseFloat(e.target.value))}
+                      className="w-24 text-right border border-slate-200 rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </td>
+                  <td className="px-6 py-3 text-right">
+                    <input
+                      type="number"
+                      step="0.50"
+                      value={price.priceMaterial}
+                      onChange={(e) => updatePrice(price.id, 'priceMaterial', parseFloat(e.target.value))}
+                      className="w-24 text-right border border-slate-200 rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </td>
+                  <td className="px-6 py-3 text-right font-bold text-slate-700">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price.priceLabor + price.priceMaterial)}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {fixedCosts.map((fc) => (
-                  <tr key={fc.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-3 font-medium text-slate-700">
-                      <input 
-                        type="text" 
-                        value={fc.item} 
-                        onChange={(e) => updateFixedCost(fc.id, 'item', e.target.value)}
-                        className="w-full bg-transparent border-b border-transparent focus:border-blue-500 outline-none hover:border-slate-300 transition-colors"
-                      />
-                    </td>
-                    <td className="px-6 py-3 text-center">
-                       <input 
-                        type="number" 
-                        step="0.01"
-                        value={fc.quantity} 
-                        onChange={(e) => updateFixedCost(fc.id, 'quantity', parseFloat(e.target.value))}
-                        // Disable manual input for Switches/Sockets as they are synced
-                        disabled={fc.item === 'Ponto Interruptor' || fc.item === 'Ponto Tomada'}
-                        className={`w-20 text-center border border-slate-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none ${fc.item === 'Ponto Interruptor' || fc.item === 'Ponto Tomada' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                      />
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                       <input 
-                        type="number" 
-                        value={fc.priceLaborUnit} 
-                        onChange={(e) => updateFixedCost(fc.id, 'priceLaborUnit', parseFloat(e.target.value))}
-                        className="w-24 text-right border border-slate-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                       <input 
-                        type="number" 
-                        value={fc.priceMaterialUnit} 
-                        onChange={(e) => updateFixedCost(fc.id, 'priceMaterialUnit', parseFloat(e.target.value))}
-                        className="w-24 text-right border border-slate-200 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
-                    </td>
-                    <td className="px-6 py-3 text-right font-medium text-slate-800">
-                      {(fc.quantity * (fc.priceLaborUnit + fc.priceMaterialUnit)).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      <button 
-                        onClick={() => deleteFixedCost(fc.id)}
-                        className="text-slate-400 hover:text-red-500 transition-colors p-1"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-slate-800">Custos Fixos e Globais</h2>
+         <Button onClick={addFixedCost}>
+           <Plus size={16} /> Adicionar Item
+         </Button>
       </div>
+      
+      <Card className="overflow-hidden">
+         <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 text-slate-600 font-medium uppercase text-xs">
+              <tr>
+                <th className="px-6 py-3">Item Global</th>
+                <th className="px-6 py-3 text-center">Qtd</th>
+                <th className="px-6 py-3 text-right w-32">MO Unit. (R$)</th>
+                <th className="px-6 py-3 text-right w-32">Mat. Unit. (R$)</th>
+                 <th className="px-6 py-3 text-right">Subtotal</th>
+                <th className="px-6 py-3 text-center w-16">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {fixedCosts.map((fc) => {
+                 const isAuto = fc.item === 'Ponto Interruptor' || fc.item === 'Ponto Tomada';
+                 return (
+                    <tr key={fc.id} className="hover:bg-slate-50">
+                      <td className="px-6 py-3">
+                        <input
+                          type="text"
+                          value={fc.item}
+                          onChange={(e) => updateFixedCost(fc.id, 'item', e.target.value)}
+                          disabled={isAuto}
+                          className={`w-full bg-transparent border-none focus:ring-0 ${isAuto ? 'text-slate-500 italic' : 'text-slate-700 font-medium'}`}
+                        />
+                         {isAuto && <span className="text-[10px] text-blue-500 block">Automático (Soma dos Ambientes)</span>}
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={fc.quantity}
+                          onChange={(e) => updateFixedCost(fc.id, 'quantity', parseFloat(e.target.value))}
+                          disabled={isAuto}
+                          className={`w-16 text-center border border-slate-200 rounded p-1 ${isAuto ? 'bg-slate-100 text-slate-500' : ''}`}
+                        />
+                      </td>
+                      <td className="px-6 py-3 text-right">
+                         <input
+                          type="number"
+                          step="10"
+                          value={fc.priceLaborUnit}
+                          onChange={(e) => updateFixedCost(fc.id, 'priceLaborUnit', parseFloat(e.target.value))}
+                          className="w-24 text-right border border-slate-200 rounded p-1"
+                        />
+                      </td>
+                      <td className="px-6 py-3 text-right">
+                         <input
+                          type="number"
+                          step="10"
+                          value={fc.priceMaterialUnit}
+                          onChange={(e) => updateFixedCost(fc.id, 'priceMaterialUnit', parseFloat(e.target.value))}
+                          className="w-24 text-right border border-slate-200 rounded p-1"
+                        />
+                      </td>
+                      <td className="px-6 py-3 text-right font-bold text-slate-700">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(fc.quantity * (fc.priceLaborUnit + fc.priceMaterialUnit))}
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        {!isAuto && (
+                          <button onClick={() => deleteFixedCost(fc.id)} className="text-red-400 hover:text-red-600">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                 );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 
@@ -1655,7 +1676,7 @@ export default function App() {
         </div>
 
         <div className="p-4 border-t border-indigo-800 text-xs text-slate-400 text-center">
-          v1.3.0
+          v1.3.1 - Force Update
         </div>
       </aside>
 
