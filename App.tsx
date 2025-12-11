@@ -15,6 +15,7 @@ import {
   RefreshCcw,
   Calendar,
   ChevronRight,
+  ChevronDown,
   Info,
   X,
   Edit2,
@@ -41,7 +42,9 @@ import {
   TrendingDown,
   AlertTriangle,
   PieChart as PieChartIcon,
-  Target
+  Target,
+  BarChart4,
+  Activity
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -58,7 +61,9 @@ import {
   Treemap,
   ScatterChart,
   Scatter,
-  ZAxis
+  ZAxis,
+  AreaChart,
+  Area
 } from 'recharts';
 import { INITIAL_ROOMS, INITIAL_PRICES, INITIAL_FIXED_COSTS } from './constants';
 import { Room, UnitPrice, FixedCost, Task, ScheduleOverride } from './types';
@@ -254,7 +259,7 @@ const TaskCostDisplay = ({ room, taskKey, unitPrices, fixedCosts }: TaskCostDisp
 
 // --- View Components ---
 
-const DashboardView = ({ calculations, rooms, handleNavigateToRoom }: any) => {
+const DashboardView = ({ calculations, rooms, handleNavigateToRoom, scheduleData }: any) => {
   const { 
     totalLabor, totalMaterial, grandTotal, disciplineData, 
     totalArea, costPerSqm, roomCostData, contingency, 
@@ -277,331 +282,305 @@ const DashboardView = ({ calculations, rooms, handleNavigateToRoom }: any) => {
     'Itens Globais': '#64748b'
   };
 
-  return (
-    <div className="space-y-12 animate-fade-in pb-12">
+  // Generate Cash Flow Data
+  const cashFlowData = useMemo(() => {
+     const tasks = scheduleData.tasks;
+     const timeline: any[] = [];
+     const maxDay = scheduleData.totalDays;
+     
+     // Initialize timeline
+     for (let i = 0; i <= maxDay; i++) {
+        timeline.push({ day: i, cost: 0, accumulated: 0 });
+     }
+
+     // Map Disciplines to Task IDs roughly for cost distribution
+     const disciplineToTaskMap: Record<string, string> = {
+        'Demolição': 'demo',
+        'Cobertura / Telhado': 'roof',
+        'Elétrica': 'infra',
+        'Hidráulica': 'infra',
+        'Impermeabilização': 'infra',
+        'Alvenaria / Refazimento': 'masonry',
+        'Reboco & Chapisco': 'masonry',
+        'Piso e Revestimento': 'tiling',
+        'Itens Globais': 'install',
+        'Pintura': 'painting',
+     };
+
+     // Distribute Discipline Costs over Task Durations
+     disciplineData.forEach((disc: any) => {
+        const taskId = disciplineToTaskMap[disc.name] || 'finish'; // Default to finish if not mapped
+        const task = tasks.find((t: any) => t.id === taskId);
         
-        {/* --- Nível Macro: Visão Geral do Projeto --- */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <LayoutDashboard className="text-blue-600" size={28} />
-             <div>
-                <h2 className="text-2xl font-bold text-slate-800">Visão Geral do Projeto (Nível Macro)</h2>
-                <p className="text-slate-500 text-sm">Resumo financeiro e estrutural da reforma.</p>
-             </div>
-          </div>
+        if (task && task.duration > 0) {
+           const dailyCost = disc.value / task.duration;
+           for (let d = 0; d < task.duration; d++) {
+              const dayIndex = task.startDay + d;
+              if (timeline[dayIndex]) {
+                 timeline[dayIndex].cost += dailyCost;
+              }
+           }
+        }
+     });
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <Card className="p-5 border-l-4 border-blue-600">
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Custo Total (s/ contingência)</p>
+     // Accumulate
+     let acc = 0;
+     timeline.forEach(point => {
+        acc += point.cost;
+        point.accumulated = acc;
+     });
+
+     return timeline.filter((_, i) => i % 5 === 0); // Sample every 5 days for cleaner chart
+  }, [disciplineData, scheduleData]);
+
+  const criticalItems = [
+     { name: 'Impermeabilização', risk: 'Alto', reason: 'Infiltrações futuras' },
+     { name: 'Elétrica', risk: 'Alto', reason: 'Risco de incêndio/curto' },
+     { name: 'Hidráulica', risk: 'Médio', reason: 'Vazamentos e quebra-quebra' },
+     { name: 'Telhado', risk: 'Alto', reason: 'Proteção da estrutura' },
+     { name: 'Estrutura/Alvenaria', risk: 'Alto', reason: 'Estabilidade' }
+  ];
+
+  const DisciplineRow = ({ item, f, DISCIPLINE_COLORS, grandTotal }: any) => {
+      // Auto-expand global items or if it contains drywall
+      const [isOpen, setIsOpen] = useState(
+         item.name === 'Itens Globais' || 
+         item.items.some((sub: any) => sub.name.toLowerCase().includes('drywall'))
+      );
+
+      return (
+         <React.Fragment>
+            <tr className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
+               <td className="py-2 px-3">
+                  <div className="flex items-center gap-2">
+                     {isOpen ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
+                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: DISCIPLINE_COLORS[item.name] || '#94a3b8' }}></div>
+                     <span className="font-medium text-slate-700 truncate max-w-[100px]">{item.name}</span>
+                  </div>
+               </td>
+               <td className="py-2 px-3 text-right font-bold text-slate-700">
+                  {f(item.value)}
+               </td>
+               <td className="py-2 px-3 text-right text-slate-400">
+                  {((item.value / grandTotal) * 100).toFixed(1)}%
+               </td>
+            </tr>
+            {isOpen && item.items.map((sub: any) => (
+               <tr key={sub.name} className="bg-slate-50/50 border-b border-slate-50">
+                  <td className="py-1 px-3 pl-10">
+                     <span className="text-[11px] text-slate-500">{sub.name}</span>
+                  </td>
+                  <td className="py-1 px-3 text-right text-[11px] font-medium text-slate-600">
+                     {f(sub.value)}
+                  </td>
+                  <td className="py-1 px-3 text-right text-[10px] text-slate-400">
+                     {((sub.value / item.value) * 100).toFixed(0)}%
+                  </td>
+               </tr>
+            ))}
+         </React.Fragment>
+      );
+  };
+
+  return (
+    <div className="space-y-8 animate-fade-in pb-12">
+        
+        {/* Header Metrics */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="p-5 border-l-4 border-blue-600 bg-gradient-to-br from-white to-blue-50/50">
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Custo Total</p>
                   <h3 className="text-2xl font-black text-slate-800 mt-1">{f(grandTotal)}</h3>
-                  <div className="mt-2 text-xs text-slate-400">
-                     Investimento Base
-                  </div>
-              </Card>
-
-              <Card className="p-5 border-l-4 border-pink-500 bg-pink-50/20">
-                  <p className="text-pink-600 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                     <AlertTriangle size={12} /> Reserva de Contingência (10%)
-                  </p>
-                  <h3 className="text-2xl font-black text-pink-700 mt-1">{f(contingency)}</h3>
-                  <div className="mt-2 text-xs text-pink-400 font-medium">
-                     Sugerido para imprevistos
-                  </div>
+                  <div className="mt-2 text-xs text-slate-400"> + {f(contingency)} (reserva)</div>
               </Card>
 
               <Card className="p-5 border-l-4 border-violet-600">
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Custo Médio por m²</p>
-                  <h3 className="text-2xl font-black text-slate-800 mt-1">{f(costPerSqm)}<span className="text-sm text-slate-400 font-medium">/m²</span></h3>
-                  <div className="mt-2 text-xs text-slate-400">
-                     Área Construída: {totalArea.toFixed(2)}m²
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Custo/m²</p>
+                  <h3 className="text-2xl font-black text-slate-800 mt-1">{f(costPerSqm)}</h3>
+                  <div className="mt-2 text-xs text-slate-400">{totalArea.toFixed(2)}m² construídos</div>
+              </Card>
+
+              <Card className="p-5 border-l-4 border-emerald-500">
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Material</p>
+                  <h3 className="text-2xl font-black text-emerald-600 mt-1">{f(totalMaterial)}</h3>
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
+                      <div className="bg-emerald-500 h-full" style={{ width: `${(totalMaterial / grandTotal) * 100}%` }}></div>
                   </div>
               </Card>
 
-              <Card className="p-5 border-l-4 border-slate-700">
-                  <div className="flex justify-between items-end mb-2">
-                     <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Composição</p>
-                     <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{Math.round((totalLabor/grandTotal)*100)}% MO</span>
-                  </div>
-                  <div className="w-full bg-emerald-500 h-2 rounded-full overflow-hidden flex">
+              <Card className="p-5 border-l-4 border-amber-500">
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Mão de Obra</p>
+                  <h3 className="text-2xl font-black text-amber-600 mt-1">{f(totalLabor)}</h3>
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
                       <div className="bg-amber-500 h-full" style={{ width: `${(totalLabor / grandTotal) * 100}%` }}></div>
                   </div>
-                  <div className="mt-2 flex justify-between text-xs font-medium">
-                     <span className="text-amber-600">MO: {f(totalLabor)}</span>
-                     <span className="text-emerald-600">Mat: {f(totalMaterial)}</span>
-                  </div>
               </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-             <Card className="p-6">
-                <h4 className="text-sm font-bold text-slate-600 mb-6 uppercase tracking-wider flex items-center gap-2">
-                   <Target size={16} /> Perfil do Investimento
-                </h4>
-                <div className="h-48 w-full relative">
-                   <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                         <Pie
-                            data={[
-                               { name: 'Obrigatórios / Infra', value: typeBreakdown.mandatory, color: '#64748b' },
-                               { name: 'Acabamento / Estética', value: typeBreakdown.aesthetic, color: '#3b82f6' }
-                            ]}
-                            dataKey="value"
-                            innerRadius={50}
-                            outerRadius={70}
-                            paddingAngle={5}
-                            stroke="none"
-                         >
-                            <Cell fill="#64748b" />
-                            <Cell fill="#3b82f6" />
-                         </Pie>
-                         <Tooltip formatter={(v: number) => f(v)} contentStyle={{borderRadius: '8px', fontSize: '12px'}} />
-                      </PieChart>
-                   </ResponsiveContainer>
-                   <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                      <span className="text-2xl font-bold text-slate-800">{Math.round((typeBreakdown.aesthetic / grandTotal) * 100)}%</span>
-                      <span className="text-[10px] text-slate-400 uppercase">Estética</span>
-                   </div>
-                </div>
-                <div className="mt-4 space-y-3">
-                   <div className="flex justify-between items-center text-sm">
-                      <span className="flex items-center gap-2 text-slate-600"><div className="w-2 h-2 rounded-full bg-slate-500"></div> Obrigatórios (Infra)</span>
-                      <span className="font-bold text-slate-800">{f(typeBreakdown.mandatory)}</span>
-                   </div>
-                   <div className="flex justify-between items-center text-sm">
-                      <span className="flex items-center gap-2 text-slate-600"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Acabamento (Estética)</span>
-                      <span className="font-bold text-slate-800">{f(typeBreakdown.aesthetic)}</span>
-                   </div>
-                </div>
-             </Card>
-
-             <Card className="p-6 lg:col-span-2">
-                <h4 className="text-sm font-bold text-slate-600 mb-6 uppercase tracking-wider flex items-center gap-2">
-                   <AlertTriangle size={16} className="text-amber-500" /> Top 3 Itens de Maior Impacto
-                </h4>
-                <div className="space-y-4">
-                   {disciplineData.slice(0, 3).map((item: any, idx: number) => (
-                      <div key={item.name} className="flex items-center gap-4 bg-slate-50/50 p-3 rounded-lg border border-slate-100">
-                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 font-bold text-slate-500 shadow-sm text-sm">
-                            {idx + 1}
-                         </div>
-                         <div className="flex-1">
-                            <div className="flex justify-between items-center mb-1">
-                               <span className="font-bold text-slate-700">{item.name}</span>
-                               <span className="font-black text-slate-800">{f(item.value)}</span>
-                            </div>
-                            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                               <div 
-                                  className="h-full rounded-full" 
-                                  style={{ width: `${(item.value / grandTotal) * 100}%`, backgroundColor: DISCIPLINE_COLORS[item.name] }}
-                               ></div>
-                            </div>
-                            <div className="mt-1 flex justify-between text-[10px] text-slate-400">
-                               <span>{((item.value / grandTotal) * 100).toFixed(1)}% do orçamento</span>
-                               <span>MO: {f(item.labor)} | Mat: {f(item.material)}</span>
-                            </div>
-                         </div>
-                      </div>
-                   ))}
-                </div>
-             </Card>
-          </div>
         </section>
 
-        {/* --- Nível Disciplina --- */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <Layers className="text-blue-600" size={28} />
-             <div>
-                <h2 className="text-2xl font-bold text-slate-800">Visão por Disciplina</h2>
-                <p className="text-slate-500 text-sm">Detalhamento técnico por etapa da obra.</p>
-             </div>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <Card className="p-6 lg:col-span-2 min-h-[400px]">
-              <h4 className="text-sm font-bold text-slate-600 mb-6 uppercase tracking-wider">Comparativo de Custos por Etapa</h4>
-              <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart 
-                    data={disciplineData} 
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} stroke="#e2e8f0" />
-                    <XAxis type="number" hide />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      width={140} 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} 
-                    />
-                    <Tooltip
-                      cursor={{fill: '#f8fafc'}}
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-white p-3 shadow-xl rounded-lg border border-slate-100">
-                              <p className="font-bold text-slate-800 border-b border-slate-100 pb-2 mb-2">{data.name}</p>
-                              <div className="space-y-1 text-xs">
-                                <p className="flex justify-between gap-4"><span className="text-slate-500">Mão de Obra:</span> <span className="font-mono font-medium text-amber-600">{f(data.labor)}</span></p>
-                                <p className="flex justify-between gap-4"><span className="text-slate-500">Materiais:</span> <span className="font-mono font-medium text-emerald-600">{f(data.material)}</span></p>
-                                <p className="flex justify-between gap-4 pt-1 border-t border-slate-50"><span className="font-bold text-slate-700">Total:</span> <span className="font-mono font-bold text-blue-600">{f(data.value)}</span></p>
-                              </div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Legend />
-                    <Bar dataKey="labor" name="Mão de Obra" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} barSize={20} />
-                    <Bar dataKey="material" name="Material" stackId="a" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-
-            <div className="space-y-4">
-               <Card className="p-0 overflow-hidden h-full flex flex-col">
-                  <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                    <h4 className="text-sm font-bold text-slate-600 uppercase tracking-wider">Tabela Detalhada</h4>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            {/* Main Column (Charts) */}
+            <div className="xl:col-span-2 space-y-8">
+               
+               {/* Cash Flow */}
+               <Card className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                     <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                        <Activity size={18} className="text-blue-500"/> Planejamento Financeiro (Fluxo de Caixa)
+                     </h4>
+                     <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded">Acumulado por Dia</span>
                   </div>
-                  <div className="overflow-y-auto flex-1 p-2 max-h-[340px]">
-                      <table className="w-full text-xs">
-                        <thead className="text-slate-400 font-medium text-left">
-                           <tr>
-                              <th className="px-3 py-1 font-normal">Disciplina</th>
-                              <th className="px-3 py-1 font-normal text-right">Total</th>
-                              <th className="px-3 py-1 font-normal text-right">%</th>
-                           </tr>
-                        </thead>
-                        <tbody>
-                          {disciplineData.map((item: any) => (
-                            <tr key={item.name} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
-                               <td className="py-2 px-3">
-                                  <div className="flex items-center gap-2">
-                                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: DISCIPLINE_COLORS[item.name] || '#94a3b8' }}></div>
-                                     <span className="font-medium text-slate-700 truncate max-w-[100px]">{item.name}</span>
-                                  </div>
-                               </td>
-                               <td className="py-2 px-3 text-right font-bold text-slate-700">
-                                  {f(item.value)}
-                               </td>
-                               <td className="py-2 px-3 text-right text-slate-400">
-                                  {((item.value / grandTotal) * 100).toFixed(1)}%
-                               </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  <div className="h-64 w-full">
+                     <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={cashFlowData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                           <defs>
+                              <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                                 <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                                 <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                              </linearGradient>
+                           </defs>
+                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                           <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10}} tickFormatter={(d) => `Dia ${d}`} />
+                           <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} tickFormatter={(v) => `R$${v/1000}k`} />
+                           <Tooltip formatter={(v: number) => f(v)} contentStyle={{borderRadius: '8px', fontSize: '12px'}} />
+                           <Area type="monotone" dataKey="accumulated" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorCost)" />
+                        </AreaChart>
+                     </ResponsiveContainer>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-2 text-center">Estimativa baseada na distribuição linear dos custos das disciplinas ao longo da duração das tarefas do cronograma.</p>
+               </Card>
+
+               {/* Room Ranking */}
+               <Card className="p-6">
+                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-6 flex items-center gap-2">
+                     <BarChart4 size={18} className="text-blue-500"/> Ranking de Custo por Ambiente
+                  </h4>
+                  <div className="h-[400px] w-full">
+                     <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={roomCostData.slice(0, 10)} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                           <XAxis type="number" hide />
+                           <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} />
+                           <Tooltip formatter={(v: number) => f(v)} cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', fontSize: '12px'}} />
+                           <Legend iconSize={8} wrapperStyle={{ fontSize: '10px' }} />
+                           <Bar dataKey="material" name="Material" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} barSize={12} />
+                           <Bar dataKey="labor" name="Mão de Obra" stackId="a" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={12} />
+                        </BarChart>
+                     </ResponsiveContainer>
                   </div>
                </Card>
+
             </div>
-          </div>
-        </section>
 
-        {/* --- Nível Ambiente + Apoio à Decisão --- */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-             <BoxSelect className="text-blue-600" size={28} />
-             <div>
-                <h2 className="text-2xl font-bold text-slate-800">Visão por Ambiente & Apoio à Decisão</h2>
-                <p className="text-slate-500 text-sm">Onde o dinheiro está sendo gasto e onde economizar.</p>
-             </div>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-             {/* Rankings / List */}
-             <Card className="p-0 overflow-hidden">
-                <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                    <h4 className="text-sm font-bold text-slate-600 uppercase tracking-wider">Ranking de Custo & Impacto</h4>
-                </div>
-                <div className="overflow-x-auto">
-                   <table className="w-full text-left text-sm">
-                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
-                         <tr>
-                            <th className="px-4 py-3 font-semibold text-xs uppercase">Ambiente</th>
-                            <th className="px-4 py-3 font-semibold text-xs uppercase text-right">Custo Total</th>
-                            <th className="px-4 py-3 font-semibold text-xs uppercase text-right">R$/m²</th>
-                            <th className="px-4 py-3 font-semibold text-xs uppercase text-center">Impacto (%)</th>
-                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                         {roomCostData.map((room: any) => (
-                           <tr key={room.id} className="hover:bg-slate-50/80 transition-colors group cursor-pointer" onClick={() => handleNavigateToRoom(room.id)}>
-                              <td className="px-4 py-3 font-medium text-slate-700 group-hover:text-blue-600">{room.name}</td>
-                              <td className="px-4 py-3 text-right font-bold text-slate-800">{f(room.total)}</td>
-                              <td className="px-4 py-3 text-right">
-                                 <span className={`px-2 py-1 rounded text-xs font-medium ${room.costSq > costPerSqm * 1.2 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
-                                    {f(room.costSq)}
-                                 </span>
-                              </td>
-                              <td className="px-4 py-3 text-center text-xs font-bold text-slate-500">
-                                 {((room.total / grandTotal) * 100).toFixed(1)}%
-                              </td>
-                           </tr>
-                         ))}
-                      </tbody>
-                   </table>
-                </div>
-             </Card>
+            {/* Side Column (Stats & Lists) */}
+            <div className="space-y-8">
+               
+               {/* Distribution Donut */}
+               <Card className="p-6">
+                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                     <PieChartIcon size={18} className="text-blue-500"/> Distribuição
+                  </h4>
+                  <div className="h-48 w-full relative mb-4">
+                     <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                           <Pie
+                              data={disciplineData}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={2}
+                           >
+                              {disciplineData.map((entry: any, index: number) => (
+                                 <Cell key={`cell-${index}`} fill={['#ef4444', '#f97316', '#eab308', '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6'][index % 8]} />
+                              ))}
+                           </Pie>
+                           <Tooltip formatter={(v: number) => f(v)} />
+                        </PieChart>
+                     </ResponsiveContainer>
+                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="text-xs font-bold text-slate-400">Por Disciplina</span>
+                     </div>
+                  </div>
+                  <div className="p-0 overflow-hidden h-full flex flex-col">
+                     <div className="p-2 border-b border-slate-100 bg-slate-50/50">
+                        <h4 className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Tabela Detalhada</h4>
+                     </div>
+                     <div className="overflow-y-auto flex-1 p-2 max-h-[300px] custom-scrollbar">
+                        <table className="w-full text-xs">
+                           <thead className="text-slate-400 font-medium text-left">
+                              <tr>
+                                 <th className="px-3 py-1 font-normal">Disciplina</th>
+                                 <th className="px-3 py-1 font-normal text-right">Total</th>
+                                 <th className="px-3 py-1 font-normal text-right">%</th>
+                              </tr>
+                           </thead>
+                           <tbody>
+                              {disciplineData.map((item: any) => (
+                                 <DisciplineRow key={item.name} item={item} f={f} DISCIPLINE_COLORS={DISCIPLINE_COLORS} grandTotal={grandTotal} />
+                              ))}
+                           </tbody>
+                        </table>
+                     </div>
+                  </div>
+               </Card>
 
-             {/* Decision Support Cards */}
-             <div className="space-y-6">
-                <Card className="p-6 border-l-4 border-emerald-500 relative overflow-hidden">
-                   <div className="absolute top-0 right-0 p-4 opacity-10">
-                      <TrendingDown size={100} className="text-emerald-500" />
-                   </div>
-                   <h4 className="text-lg font-bold text-emerald-800 mb-2 flex items-center gap-2">
-                      <TrendingDown size={20} /> Simulador de Economia
+               {/* Critical Items Table */}
+               <Card className="p-0 overflow-hidden">
+                  <div className="p-4 bg-slate-50 border-b border-slate-100">
+                     <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                        <AlertTriangle size={18} className="text-rose-500"/> Itens Críticos
+                     </h4>
+                  </div>
+                  <table className="w-full text-left text-xs">
+                     <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                        <tr>
+                           <th className="px-4 py-2 font-semibold">Item</th>
+                           <th className="px-4 py-2 font-semibold">Risco</th>
+                           <th className="px-4 py-2 font-semibold text-right">Custo Estimado</th>
+                        </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-50">
+                        {criticalItems.map(item => {
+                           // Find approximate cost from disciplines
+                           const cost = disciplineData.find((d: any) => d.name.toLowerCase().includes(item.name.toLowerCase().split('/')[0]))?.value || 0;
+                           return (
+                              <tr key={item.name} className="group hover:bg-slate-50">
+                                 <td className="px-4 py-3">
+                                    <div className="font-bold text-slate-700">{item.name}</div>
+                                    <div className="text-[10px] text-slate-400">{item.reason}</div>
+                                 </td>
+                                 <td className="px-4 py-3">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${item.risk === 'Alto' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                                       {item.risk}
+                                    </span>
+                                 </td>
+                                 <td className="px-4 py-3 text-right font-mono text-slate-600">
+                                    {f(cost)}
+                                 </td>
+                              </tr>
+                           );
+                        })}
+                     </tbody>
+                  </table>
+               </Card>
+
+               {/* Economy Sim */}
+               <Card className="p-6 bg-gradient-to-br from-emerald-50 to-white border border-emerald-100">
+                   <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+                      <TrendingDown size={18}/> Potencial de Economia
                    </h4>
-                   <p className="text-sm text-emerald-700/80 mb-6">
-                      Se você optar por acabamentos mais simples (ex: cerâmica padrão comercial e pintura econômica), reduzindo 20% do custo de material nestes itens:
-                   </p>
-                   
-                   <div className="bg-white/50 rounded-lg p-4 border border-emerald-100 backdrop-blur-sm">
-                      <div className="flex justify-between items-center mb-2">
-                         <span className="text-sm font-medium text-emerald-800">Economia Estimada</span>
-                         <span className="text-2xl font-black text-emerald-600">-{f(economySimulation)}</span>
-                      </div>
-                      <div className="w-full bg-emerald-200 h-1.5 rounded-full overflow-hidden">
-                         <div className="bg-emerald-500 h-full" style={{ width: '100%' }}></div>
-                      </div>
-                      <p className="text-[10px] text-emerald-600 mt-2 text-right">
-                         Impacto no orçamento total: -{((economySimulation / grandTotal) * 100).toFixed(1)}%
-                      </p>
+                   <p className="text-xs text-emerald-600 mb-4">Reduzindo 20% em acabamentos estéticos.</p>
+                   <div className="flex items-end justify-between">
+                      <span className="text-3xl font-black text-emerald-600">-{f(economySimulation)}</span>
+                      <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded">
+                         -{((economySimulation / grandTotal) * 100).toFixed(1)}% Total
+                      </span>
                    </div>
-                </Card>
+               </Card>
 
-                <Card className="p-6 border-l-4 border-slate-500">
-                   <h4 className="text-lg font-bold text-slate-800 mb-4">Análise de Risco</h4>
-                   <ul className="space-y-3 text-sm text-slate-600">
-                      <li className="flex gap-3 items-start">
-                         <div className="mt-1 min-w-[6px] h-[6px] rounded-full bg-rose-500"></div>
-                         <span>
-                            <strong className="text-slate-800">Custo Obrigatório:</strong> {Math.round((typeBreakdown.mandatory / grandTotal) * 100)}% do orçamento é infraestrutura. Não economize aqui para evitar patologias futuras.
-                         </span>
-                      </li>
-                      <li className="flex gap-3 items-start">
-                         <div className="mt-1 min-w-[6px] h-[6px] rounded-full bg-amber-500"></div>
-                         <span>
-                            <strong className="text-slate-800">Contingência:</strong> Recomenda-se reservar ao menos {f(contingency)} (10%) além do orçamento calculado.
-                         </span>
-                      </li>
-                      <li className="flex gap-3 items-start">
-                         <div className="mt-1 min-w-[6px] h-[6px] rounded-full bg-blue-500"></div>
-                         <span>
-                            <strong className="text-slate-800">Maior Custo por m²:</strong> {roomCostData[0]?.name} ({f(roomCostData[0]?.costSq)}/m²). Revise os acabamentos deste ambiente se precisar reduzir custos.
-                         </span>
-                      </li>
-                   </ul>
-                </Card>
-             </div>
-          </div>
-        </section>
+            </div>
+        </div>
     </div>
   );
 };
@@ -1216,17 +1195,17 @@ export default function App() {
     let totalMaterial = 0; 
     
     // For discipline breakdown
-    const disciplineMap: Record<string, { labor: number; material: number; value: number }> = {
-      'Demolição': { labor: 0, material: 0, value: 0 },
-      'Alvenaria / Refazimento': { labor: 0, material: 0, value: 0 },
-      'Reboco & Chapisco': { labor: 0, material: 0, value: 0 },
-      'Piso e Revestimento': { labor: 0, material: 0, value: 0 },
-      'Pintura': { labor: 0, material: 0, value: 0 },
-      'Elétrica': { labor: 0, material: 0, value: 0 },
-      'Hidráulica': { labor: 0, material: 0, value: 0 },
-      'Cobertura / Telhado': { labor: 0, material: 0, value: 0 },
-      'Impermeabilização': { labor: 0, material: 0, value: 0 },
-      'Itens Globais': { labor: 0, material: 0, value: 0 }
+    const disciplineMap: Record<string, { labor: number; material: number; value: number; subItems: Record<string, number> }> = {
+      'Demolição': { labor: 0, material: 0, value: 0, subItems: {} },
+      'Alvenaria / Refazimento': { labor: 0, material: 0, value: 0, subItems: {} },
+      'Reboco & Chapisco': { labor: 0, material: 0, value: 0, subItems: {} },
+      'Piso e Revestimento': { labor: 0, material: 0, value: 0, subItems: {} },
+      'Pintura': { labor: 0, material: 0, value: 0, subItems: {} },
+      'Elétrica': { labor: 0, material: 0, value: 0, subItems: {} },
+      'Hidráulica': { labor: 0, material: 0, value: 0, subItems: {} },
+      'Cobertura / Telhado': { labor: 0, material: 0, value: 0, subItems: {} },
+      'Impermeabilização': { labor: 0, material: 0, value: 0, subItems: {} },
+      'Itens Globais': { labor: 0, material: 0, value: 0, subItems: {} }
     };
 
     // For Decision Support
@@ -1273,6 +1252,10 @@ export default function App() {
             disciplineMap[cat].labor += costL;
             disciplineMap[cat].material += costM;
             disciplineMap[cat].value += total;
+
+            const subName = price.item;
+            if (!disciplineMap[cat].subItems[subName]) disciplineMap[cat].subItems[subName] = 0;
+            disciplineMap[cat].subItems[subName] += total;
           }
 
           // Type Breakdown
@@ -1312,6 +1295,10 @@ export default function App() {
           disciplineMap[cat].labor += costL;
           disciplineMap[cat].material += costM;
           disciplineMap[cat].value += total;
+
+          const subName = fc.item;
+          if (!disciplineMap[cat].subItems[subName]) disciplineMap[cat].subItems[subName] = 0;
+          disciplineMap[cat].subItems[subName] += total;
        }
        
        const impactType = getImpactCategory(cat);
@@ -1341,7 +1328,13 @@ export default function App() {
 
     const grandTotal = totalLabor + totalMaterial;
     const disciplineDataArray = Object.entries(disciplineMap)
-      .map(([name, data]) => ({ name, ...data }))
+      .map(([name, data]) => ({ 
+         name, 
+         ...data, 
+         items: Object.entries(data.subItems)
+            .map(([k, v]) => ({ name: k, value: v }))
+            .sort((a, b) => b.value - a.value)
+      }))
       .sort((a, b) => b.value - a.value); // Sort by highest cost
 
     return { 
