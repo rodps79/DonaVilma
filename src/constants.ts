@@ -28,7 +28,7 @@ export const INITIAL_FIXED_COSTS: FixedCost[] = [
   { id: 'f1', item: 'Portas', quantity: 10, priceLaborUnit: 100, priceMaterialUnit: 400 },
   { id: 'f2', item: 'Janelas', quantity: 11, priceLaborUnit: 100, priceMaterialUnit: 550 },
   { id: 'f12', item: 'Alvenaria Nova (m²)', quantity: 0, priceLaborUnit: 70.00, priceMaterialUnit: 50.00 },
-  { id: 'f13', item: 'Drywall (m²)', quantity: 17, priceLaborUnit: 45.00, priceMaterialUnit: 65.00 },
+  { id: 'f13', item: 'Drywall (m²)', quantity: 0, priceLaborUnit: 45.00, priceMaterialUnit: 65.00 },
   { id: 'f5', item: 'Impermeabilização', quantity: 21.75, priceLaborUnit: 35.00, priceMaterialUnit: 35.00 },
   { id: 'f6', item: 'Telhado', quantity: 52.00, priceLaborUnit: 45.00, priceMaterialUnit: 80.00 },
   { id: 'f7', item: 'Hidráulica (Geral)', quantity: 1, priceLaborUnit: 2500.00, priceMaterialUnit: 1500.00 },
@@ -211,29 +211,12 @@ export const INITIAL_ROOMS: Room[] = [
   },
   {
     id: 'r11',
-    name: 'Corredor 1',
+    name: 'Corredor',
     type: 'terreo',
-    width: 1.07,
-    length: 5.00,
+    width: 1.00,
+    length: 3.80,
     height: 2.40,
     deductionArea: 4.67,
-    switchCount: 0,
-    socketCount: 0,
-    tasks: {
-      demo_floor: false, demo_wall: false, demo_ceiling: false,
-      ref_floor_ceramic: false, ref_floor_screed: false,
-      ref_wall_plaster: false, ref_wall_ceramic: false, ref_wall_paint: true,
-      ref_ceiling_gypsum: false, ref_ceiling_plaster: false, ref_ceiling_paint: false, ref_ceiling_pvc: true
-    }
-  },
-  {
-    id: 'r20',
-    name: 'Corredor 2',
-    type: 'terreo',
-    width: 1.10,
-    length: 3.43,
-    height: 2.55,
-    deductionArea: 5.04, // 3 vãos de 0.8x2.1
     switchCount: 0,
     socketCount: 0,
     tasks: {
@@ -247,10 +230,10 @@ export const INITIAL_ROOMS: Room[] = [
     id: 'r12',
     name: 'Dormitório 1',
     type: 'terreo',
-    width: 2.15,
-    length: 3.32,
+    width: 2.13,
+    length: 3.80,
     height: 2.40,
-    deductionArea: 1.68, // 0.8 x 2.1
+    deductionArea: 3.63,
     switchCount: 1,
     socketCount: 2,
     tasks: {
@@ -261,11 +244,28 @@ export const INITIAL_ROOMS: Room[] = [
     }
   },
   {
+    id: 'r13',
+    name: 'Circulação',
+    type: 'terreo',
+    width: 2.15,
+    length: 1.40,
+    height: 2.60,
+    deductionArea: 4.53,
+    switchCount: 1,
+    socketCount: 0,
+    tasks: {
+      demo_floor: false, demo_wall: true, demo_ceiling: true,
+      ref_floor_ceramic: false, ref_floor_screed: false,
+      ref_wall_plaster: false, ref_wall_ceramic: false, ref_wall_paint: true,
+      ref_ceiling_gypsum: false, ref_ceiling_plaster: false, ref_ceiling_paint: false, ref_ceiling_pvc: true
+    }
+  },
+  {
     id: 'r14',
     name: 'Banheiro 1',
     type: 'terreo',
-    width: 1.40,
-    length: 3.14,
+    width: 1.95,
+    length: 1.40,
     height: 2.50,
     deductionArea: 2.01,
     switchCount: 0,
@@ -298,8 +298,8 @@ export const INITIAL_ROOMS: Room[] = [
     id: 'r16',
     name: 'Dormitório 2',
     type: 'terreo',
-    width: 3.43,
-    length: 1.97,
+    width: 3.22,
+    length: 3.43,
     height: 2.55,
     deductionArea: 4.71,
     switchCount: 2,
@@ -318,7 +318,7 @@ export const INITIAL_ROOMS: Room[] = [
     width: 1.95,
     length: 2.04,
     height: 2.68,
-    deductionArea: 1.55, // 0.75 x 2.06
+    deductionArea: 5.55,
     switchCount: 1,
     socketCount: 1,
     tasks: {

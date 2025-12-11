@@ -59,3 +59,18 @@ export interface SummaryData {
   grandTotal: number;
   categoryBreakdown: { name: string; value: number }[];
 }
+
+export interface Task {
+  id: string;
+  name: string;
+  duration: number;
+  startDay: number;
+  color: string;
+  dependency: string | null;
+}
+
+export interface ScheduleOverride {
+  duration?: number;
+  startDay?: number;
+  dependency?: string | null;
+}
