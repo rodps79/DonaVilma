@@ -44,7 +44,8 @@ import {
   PieChart as PieChartIcon,
   Target,
   BarChart4,
-  Activity
+  Activity,
+  Printer
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -70,8 +71,8 @@ import { Room, UnitPrice, FixedCost, Task, ScheduleOverride } from './types';
 
 // --- Styles Constants ---
 const STYLES = {
-  input: "w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent block p-2.5 transition-all outline-none hover:bg-white",
-  inputSmall: "bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent block p-1.5 transition-all outline-none text-center",
+  input: "w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent block p-2.5 transition-all outline-none hover:bg-white print:hidden",
+  inputSmall: "bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent block p-1.5 transition-all outline-none text-center print:border-none print:bg-transparent print:p-0 print:text-right",
   inputCompact: "w-full bg-white border border-slate-200 text-slate-700 text-xs rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block px-2 py-1 transition-all outline-none shadow-sm font-medium h-7",
   label: "block mb-1 text-xs font-semibold text-slate-500 uppercase tracking-wide",
   labelCompact: "block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5",
@@ -152,7 +153,7 @@ const Card: React.FC<CardProps> = ({ children, className = "", id, style, onClic
 );
 
 const Button = ({ onClick, children, variant = 'primary', className = "" }: any) => {
-  const baseStyle = "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 shadow-sm";
+  const baseStyle = "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 shadow-sm print:hidden";
   const variants = {
     primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200 hover:shadow-blue-300",
     secondary: "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 hover:text-slate-900",
@@ -884,20 +885,45 @@ const SynthesisView = ({ rooms, unitPrices, fixedCosts }: any) => {
     });
   }, [rooms, unitPrices, fixedCosts]);
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <div className="space-y-6 animate-fade-in pb-20">
-       <div className="flex items-center gap-3">
-          <FileText className="text-blue-600" size={28} />
-          <div>
-             <h2 className="text-2xl font-bold text-slate-800">Síntese de Ambientes</h2>
-             <p className="text-slate-500 text-sm">Detalhamento quantitativo e financeiro por cômodo.</p>
+    <div className="space-y-6 animate-fade-in pb-20 print:pb-0 print:space-y-4">
+       {/* Print specific styles to handle layout issues */}
+       <style>{`
+         @media print {
+           @page { size: landscape; margin: 10mm; }
+           body { background: white; -webkit-print-color-adjust: exact; }
+           .print-hidden { display: none !important; }
+           .print-visible { display: block !important; }
+         }
+       `}</style>
+
+       <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <FileText className="text-blue-600 print:hidden" size={28} />
+             <div>
+                <h2 className="text-2xl font-bold text-slate-800">Síntese de Ambientes</h2>
+                <p className="text-slate-500 text-sm print:hidden">Detalhamento quantitativo e financeiro por cômodo.</p>
+             </div>
           </div>
+          <Button onClick={handlePrint} variant="secondary" className="print:hidden">
+            <Printer size={18}/> Imprimir / PDF
+          </Button>
        </div>
 
-       <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
+       {/* Print Header */}
+       <div className="hidden print:block mb-6 border-b border-slate-900 pb-4">
+          <h1 className="text-3xl font-bold text-slate-900">Relatório de Custos de Reforma</h1>
+          <p className="text-slate-600">Gerado em: {new Date().toLocaleDateString()}</p>
+       </div>
+
+       <Card className="p-0 overflow-hidden print:shadow-none print:border print:border-slate-300">
+          <div className="overflow-x-auto print:overflow-visible">
              <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 uppercase tracking-wider">
+                <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 uppercase tracking-wider print:bg-slate-100 print:text-slate-900">
                    <tr>
                       <th className="px-4 py-3 font-bold">Ambiente</th>
                       <th className="px-4 py-3 font-bold text-right">PD (m)</th>
@@ -905,29 +931,29 @@ const SynthesisView = ({ rooms, unitPrices, fixedCosts }: any) => {
                       <th className="px-4 py-3 font-bold text-right">Par. Bruta (m²)</th>
                       <th className="px-4 py-3 font-bold text-right">Par. Útil (m²)</th>
                       <th className="px-4 py-3 font-bold text-right">Perímetro (m)</th>
-                      <th className="px-4 py-3 font-bold text-right text-rose-600">Demolição ($)</th>
-                      <th className="px-4 py-3 font-bold text-right text-emerald-600">Refazimento ($)</th>
+                      <th className="px-4 py-3 font-bold text-right text-rose-600 print:text-rose-800">Demolição ($)</th>
+                      <th className="px-4 py-3 font-bold text-right text-emerald-600 print:text-emerald-800">Refazimento ($)</th>
                       <th className="px-4 py-3 font-bold text-center">Interruptores</th>
                       <th className="px-4 py-3 font-bold text-center">Tomadas</th>
                    </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-50 print:divide-slate-200">
                    {tableData.map((row: any) => (
-                      <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                         <td className="px-4 py-3 font-bold text-blue-600">{row.name}</td>
+                      <tr key={row.id} className="hover:bg-slate-50 transition-colors print:break-inside-avoid">
+                         <td className="px-4 py-3 font-bold text-blue-600 print:text-blue-800">{row.name}</td>
                          <td className="px-4 py-3 text-right text-slate-600">{fn(row.height)}</td>
                          <td className="px-4 py-3 text-right text-slate-600">{fn(row.floorArea)}</td>
                          <td className="px-4 py-3 text-right text-slate-400">{fn(row.wallAreaGross)}</td>
                          <td className="px-4 py-3 text-right font-medium text-slate-700">{fn(row.wallAreaNet)}</td>
                          <td className="px-4 py-3 text-right text-slate-400">{fn(row.perimeter)}</td>
-                         <td className="px-4 py-3 text-right font-medium text-rose-600">{f(row.demoCost)}</td>
-                         <td className="px-4 py-3 text-right font-medium text-emerald-600">{f(row.refazimentoCost)}</td>
+                         <td className="px-4 py-3 text-right font-medium text-rose-600 print:text-rose-800">{f(row.demoCost)}</td>
+                         <td className="px-4 py-3 text-right font-medium text-emerald-600 print:text-emerald-800">{f(row.refazimentoCost)}</td>
                          <td className="px-4 py-3 text-center text-slate-600">{row.switchCount}</td>
                          <td className="px-4 py-3 text-center text-slate-600">{row.socketCount}</td>
                       </tr>
                    ))}
                 </tbody>
-                <tfoot className="bg-slate-50 font-bold text-slate-700 border-t border-slate-200">
+                <tfoot className="bg-slate-50 font-bold text-slate-700 border-t border-slate-200 print:bg-slate-100">
                     <tr>
                         <td className="px-4 py-3">TOTAIS</td>
                         <td className="px-4 py-3 text-right">-</td>
@@ -1427,7 +1453,7 @@ export default function App() {
   
   return (
     <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
-        <aside className="w-20 lg:w-64 bg-slate-900 text-slate-300 flex flex-col fixed h-full z-50 transition-all duration-300">
+        <aside className="w-20 lg:w-64 bg-slate-900 text-slate-300 flex flex-col fixed h-full z-50 transition-all duration-300 print:hidden">
             <div className="h-20 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-800">
                 <div className="bg-blue-600 p-2 rounded-lg"><Home className="text-white" size={24} /></div>
                 <span className="ml-3 font-bold text-white text-lg hidden lg:block tracking-tight">Reforma<span className="text-blue-500">Calc</span></span>
@@ -1447,7 +1473,7 @@ export default function App() {
             </div>
         </aside>
         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
-        <main className="flex-1 ml-20 lg:ml-64 p-4 md:p-8 overflow-x-hidden">
+        <main className="flex-1 ml-20 lg:ml-64 p-4 md:p-8 overflow-x-hidden print:ml-0 print:p-0">
             <div className="max-w-7xl mx-auto">
                 {activeTab === 'dashboard' && <DashboardView calculations={calculations} rooms={rooms} fixedCosts={fixedCosts} handleNavigateToRoom={handleNavigateToRoom} scheduleData={scheduleData} />}
                 {activeTab === 'rooms' && <RoomsView rooms={rooms} unitPrices={unitPrices} fixedCosts={fixedCosts} highlightedRoomId={highlightedRoomId} setHighlightedRoomId={setHighlightedRoomId} addRoom={addRoom} updateRoom={updateRoom} updateRoomTask={updateRoomTask} deleteRoom={deleteRoom} />}
