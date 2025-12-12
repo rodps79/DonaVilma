@@ -73,12 +73,12 @@ import { Room, UnitPrice, FixedCost, Task, ScheduleOverride } from './types';
 const STYLES = {
   input: "w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent block p-2.5 transition-all outline-none hover:bg-white print:hidden",
   inputSmall: "bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent block p-1.5 transition-all outline-none text-center print:border-none print:bg-transparent print:p-0 print:text-right",
-  inputCompact: "w-full bg-white border border-slate-200 text-slate-700 text-xs rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block px-2 py-1 transition-all outline-none shadow-sm font-medium h-7",
+  inputCompact: "w-full bg-white border border-slate-200 text-slate-700 text-xs rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block px-2 py-1 transition-all outline-none shadow-sm font-medium h-7 print:border-none print:bg-transparent print:p-0 print:h-auto print:text-right print:shadow-none",
   label: "block mb-1 text-xs font-semibold text-slate-500 uppercase tracking-wide",
   labelCompact: "block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5",
-  card: "bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 ring-1 ring-slate-900/5",
-  tableHeader: "bg-slate-50 text-slate-500 text-xs uppercase font-semibold tracking-wider text-left py-3 px-4 border-b border-slate-100",
-  tableCell: "py-3 px-4 text-sm text-slate-600 border-b border-slate-50 group-hover:bg-slate-50/50 transition-colors",
+  card: "bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 ring-1 ring-slate-900/5 print:shadow-none print:ring-1 print:ring-slate-200",
+  tableHeader: "bg-slate-50 text-slate-500 text-xs uppercase font-semibold tracking-wider text-left py-3 px-4 border-b border-slate-100 print:bg-slate-100 print:text-slate-900",
+  tableCell: "py-3 px-4 text-sm text-slate-600 border-b border-slate-50 group-hover:bg-slate-50/50 transition-colors print:border-slate-200",
 };
 
 // --- Helper Functions ---
@@ -351,12 +351,12 @@ const DashboardView = ({ calculations, rooms, handleNavigateToRoom, scheduleData
 
       return (
          <React.Fragment>
-            <tr className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
+            <tr className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer print:break-inside-avoid" onClick={() => setIsOpen(!isOpen)}>
                <td className="py-2 px-3">
                   <div className="flex items-center gap-2">
-                     {isOpen ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
+                     {isOpen ? <ChevronDown size={14} className="text-slate-400 print:hidden" /> : <ChevronRight size={14} className="text-slate-400 print:hidden" />}
                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: DISCIPLINE_COLORS[item.name] || '#94a3b8' }}></div>
-                     <span className="font-medium text-slate-700 truncate max-w-[100px]">{item.name}</span>
+                     <span className="font-medium text-slate-700 truncate max-w-[100px] print:max-w-none">{item.name}</span>
                   </div>
                </td>
                <td className="py-2 px-3 text-right font-bold text-slate-700">
@@ -367,7 +367,7 @@ const DashboardView = ({ calculations, rooms, handleNavigateToRoom, scheduleData
                </td>
             </tr>
             {isOpen && item.items.map((sub: any) => (
-               <tr key={sub.name} className="bg-slate-50/50 border-b border-slate-50">
+               <tr key={sub.name} className="bg-slate-50/50 border-b border-slate-50 print:bg-transparent">
                   <td className="py-1 px-3 pl-10">
                      <span className="text-[11px] text-slate-500">{sub.name}</span>
                   </td>
@@ -383,11 +383,43 @@ const DashboardView = ({ calculations, rooms, handleNavigateToRoom, scheduleData
       );
   };
 
+  const handlePrint = () => window.print();
+
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
-        
+    <div className="space-y-8 animate-fade-in pb-12 print:space-y-4 print:pb-0 dashboard-print-container">
+        <style>{`
+         @media print {
+           @page { size: A4 landscape; margin: 5mm; }
+           body { -webkit-print-color-adjust: exact; }
+           .print-hidden { display: none !important; }
+           /* Scale dashboard to fit single page A4 Landscape */
+           .dashboard-print-container { zoom: 0.65; } 
+           ::-webkit-scrollbar { display: none; }
+           /* Expand scrolls for print */
+           .custom-scrollbar { overflow: visible !important; height: auto !important; max-height: none !important; }
+         }
+       `}</style>
+
+       {/* Print Header */}
+       <div className="hidden print:block mb-4 border-b border-slate-900 pb-2">
+          <div className="flex justify-between items-center">
+             <h1 className="text-2xl font-bold text-slate-900">Dashboard de Custos - ReformaCalc Pro</h1>
+             <p className="text-sm text-slate-600">{new Date().toLocaleDateString()}</p>
+          </div>
+       </div>
+
         {/* Header Metrics */}
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="flex justify-between items-end mb-6 print:hidden">
+           <div>
+              <h2 className="text-2xl font-bold text-slate-800">Visão Geral do Projeto</h2>
+              <p className="text-slate-500 text-sm">Resumo financeiro e estrutural da reforma.</p>
+           </div>
+           <Button onClick={handlePrint} variant="secondary">
+             <Printer size={18}/> Imprimir Dashboard
+           </Button>
+        </section>
+
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 print:gap-4">
               <Card className="p-5 border-l-4 border-blue-600 bg-gradient-to-br from-white to-blue-50/50">
                   <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Custo Total</p>
                   <h3 className="text-2xl font-black text-slate-800 mt-1">{f(grandTotal)}</h3>
@@ -417,9 +449,9 @@ const DashboardView = ({ calculations, rooms, handleNavigateToRoom, scheduleData
               </Card>
         </section>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 print:gap-6">
             {/* Main Column (Charts) */}
-            <div className="xl:col-span-2 space-y-8">
+            <div className="xl:col-span-2 space-y-8 print:space-y-6">
                
                {/* Cash Flow */}
                <Card className="p-6">
@@ -472,7 +504,7 @@ const DashboardView = ({ calculations, rooms, handleNavigateToRoom, scheduleData
             </div>
 
             {/* Side Column (Stats & Lists) */}
-            <div className="space-y-8">
+            <div className="space-y-8 print:space-y-6">
                
                {/* Distribution Donut */}
                <Card className="p-6">
@@ -504,7 +536,7 @@ const DashboardView = ({ calculations, rooms, handleNavigateToRoom, scheduleData
                      </div>
                   </div>
                   <div className="p-0 overflow-hidden h-full flex flex-col">
-                     <div className="p-2 border-b border-slate-100 bg-slate-50/50">
+                     <div className="p-2 border-b border-slate-100 bg-slate-50/50 print:bg-slate-100">
                         <h4 className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Tabela Detalhada</h4>
                      </div>
                      <div className="overflow-y-auto flex-1 p-2 max-h-[300px] custom-scrollbar">
@@ -528,13 +560,13 @@ const DashboardView = ({ calculations, rooms, handleNavigateToRoom, scheduleData
 
                {/* Critical Items Table */}
                <Card className="p-0 overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-100">
+                  <div className="p-4 bg-slate-50 border-b border-slate-100 print:bg-slate-100">
                      <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                         <AlertTriangle size={18} className="text-rose-500"/> Itens Críticos
                      </h4>
                   </div>
                   <table className="w-full text-left text-xs">
-                     <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                     <thead className="bg-slate-50 text-slate-500 border-b border-slate-100 print:bg-slate-50">
                         <tr>
                            <th className="px-4 py-2 font-semibold">Item</th>
                            <th className="px-4 py-2 font-semibold">Risco</th>
@@ -546,7 +578,7 @@ const DashboardView = ({ calculations, rooms, handleNavigateToRoom, scheduleData
                            // Find approximate cost from disciplines
                            const cost = disciplineData.find((d: any) => d.name.toLowerCase().includes(item.name.toLowerCase().split('/')[0]))?.value || 0;
                            return (
-                              <tr key={item.name} className="group hover:bg-slate-50">
+                              <tr key={item.name} className="group hover:bg-slate-50 print:break-inside-avoid">
                                  <td className="px-4 py-3">
                                     <div className="font-bold text-slate-700">{item.name}</div>
                                     <div className="text-[10px] text-slate-400">{item.reason}</div>
@@ -567,7 +599,7 @@ const DashboardView = ({ calculations, rooms, handleNavigateToRoom, scheduleData
                </Card>
 
                {/* Economy Sim */}
-               <Card className="p-6 bg-gradient-to-br from-emerald-50 to-white border border-emerald-100">
+               <Card className="p-6 bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 print:bg-white print:border-emerald-200">
                    <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center gap-2">
                       <TrendingDown size={18}/> Potencial de Economia
                    </h4>
@@ -703,11 +735,40 @@ const RoomsView = ({ rooms, unitPrices, fixedCosts, highlightedRoomId, setHighli
 };
 
 const PricesView = ({ unitPrices, fixedCosts, updatePrice, updateFixedCost, addFixedCost, deleteFixedCost }: any) => {
+  const handlePrint = () => window.print();
+
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="p-0 overflow-hidden">
-             <div className="p-4 bg-slate-50 border-b border-slate-100">
+    <div className="space-y-8 animate-fade-in pb-20 print:pb-0 print:space-y-4">
+       <style>{`
+         @media print {
+           @page { size: A4 landscape; margin: 10mm; }
+           body { -webkit-print-color-adjust: exact; }
+           .print-hidden { display: none !important; }
+           /* Ensure tables fit and look like reports */
+           table { font-size: 10px; }
+           input { border: none !important; background: transparent !important; padding: 0 !important; text-align: right; }
+           td:last-child, th:last-child { display: none; } /* Hide actions column */
+         }
+       `}</style>
+
+       {/* Print Header */}
+       <div className="hidden print:block mb-4 border-b border-slate-900 pb-2">
+          <div className="flex justify-between items-center">
+             <h1 className="text-2xl font-bold text-slate-900">Composição de Custos - ReformaCalc Pro</h1>
+             <p className="text-sm text-slate-600">{new Date().toLocaleDateString()}</p>
+          </div>
+       </div>
+
+       <div className="flex justify-between items-center print:hidden">
+          <h2 className="text-2xl font-bold text-slate-800">Custos & Composições</h2>
+          <Button onClick={handlePrint} variant="secondary">
+             <Printer size={18}/> Imprimir Lista
+          </Button>
+       </div>
+
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 print:gap-4">
+          <Card className="p-0 overflow-hidden print:shadow-none print:border print:border-slate-300">
+             <div className="p-4 bg-slate-50 border-b border-slate-100 print:bg-slate-100">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2"><DollarSign size={18} className="text-blue-500"/> Composições Unitárias</h3>
              </div>
              <div className="overflow-x-auto">
@@ -720,9 +781,9 @@ const PricesView = ({ unitPrices, fixedCosts, updatePrice, updateFixedCost, addF
                          <th className="text-right">Material (R$)</th>
                       </tr>
                    </thead>
-                   <tbody className="divide-y divide-slate-50">
+                   <tbody className="divide-y divide-slate-50 print:divide-slate-200">
                       {unitPrices.map((price: UnitPrice) => (
-                         <tr key={price.id} className="hover:bg-slate-50">
+                         <tr key={price.id} className="hover:bg-slate-50 print:break-inside-avoid">
                             <td className="px-4 py-3 font-medium text-slate-700">{price.item} <span className="text-[10px] text-slate-400 block font-normal">{price.category}</span></td>
                             <td className="px-4 py-3 text-slate-500 text-xs">{price.unit}</td>
                             <td className="px-4 py-3 text-right"><SmartNumberInput value={price.priceLabor} onValueChange={(v) => updatePrice(price.id, 'priceLabor', v)} className={`${STYLES.inputCompact} w-20 ml-auto`} /></td>
@@ -734,10 +795,10 @@ const PricesView = ({ unitPrices, fixedCosts, updatePrice, updateFixedCost, addF
              </div>
           </Card>
 
-          <Card className="p-0 overflow-hidden flex flex-col">
-             <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+          <Card className="p-0 overflow-hidden flex flex-col print:shadow-none print:border print:border-slate-300">
+             <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center print:bg-slate-100">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2"><BoxSelect size={18} className="text-purple-500"/> Custos Fixos / Quantitativos</h3>
-                <Button onClick={addFixedCost} variant="secondary" className="text-xs py-1 px-2 h-8"><Plus size={14}/> Adicionar</Button>
+                <Button onClick={addFixedCost} variant="secondary" className="text-xs py-1 px-2 h-8 print:hidden"><Plus size={14}/> Adicionar</Button>
              </div>
              <div className="overflow-x-auto flex-1">
                 <table className="w-full text-left text-sm">
@@ -747,14 +808,14 @@ const PricesView = ({ unitPrices, fixedCosts, updatePrice, updateFixedCost, addF
                          <th className="w-20 text-center">Qtd.</th>
                          <th className="text-right">M. Obra</th>
                          <th className="text-right">Mat.</th>
-                         <th className="w-8"></th>
+                         <th className="w-8 print:hidden"></th>
                       </tr>
                    </thead>
-                   <tbody className="divide-y divide-slate-50">
+                   <tbody className="divide-y divide-slate-50 print:divide-slate-200">
                       {fixedCosts.map((fc: FixedCost) => (
-                         <tr key={fc.id} className="hover:bg-slate-50">
+                         <tr key={fc.id} className="hover:bg-slate-50 print:break-inside-avoid">
                             <td className="px-4 py-2">
-                               <input type="text" value={fc.item} onChange={(e) => updateFixedCost(fc.id, 'item', e.target.value)} className={`${STYLES.inputCompact} font-medium`} />
+                               <input type="text" value={fc.item} onChange={(e) => updateFixedCost(fc.id, 'item', e.target.value)} className={`${STYLES.inputCompact} font-medium print:text-left`} />
                             </td>
                             <td className="px-2 py-2">
                                <SmartNumberInput value={fc.quantity} onValueChange={(v) => updateFixedCost(fc.id, 'quantity', v)} className={`${STYLES.inputCompact} text-center`} />
@@ -765,7 +826,7 @@ const PricesView = ({ unitPrices, fixedCosts, updatePrice, updateFixedCost, addF
                             <td className="px-2 py-2">
                                <SmartNumberInput value={fc.priceMaterialUnit} onValueChange={(v) => updateFixedCost(fc.id, 'priceMaterialUnit', v)} className={`${STYLES.inputCompact} text-right`} />
                             </td>
-                            <td className="px-2 py-2 text-center">
+                            <td className="px-2 py-2 text-center print:hidden">
                                <button onClick={() => deleteFixedCost(fc.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
                             </td>
                          </tr>
@@ -894,7 +955,7 @@ const SynthesisView = ({ rooms, unitPrices, fixedCosts }: any) => {
        {/* Print specific styles to handle layout issues */}
        <style>{`
          @media print {
-           @page { size: landscape; margin: 10mm; }
+           @page { size: A4 landscape; margin: 10mm; }
            body { background: white; -webkit-print-color-adjust: exact; }
            .print-hidden { display: none !important; }
            .print-visible { display: block !important; }
@@ -916,8 +977,10 @@ const SynthesisView = ({ rooms, unitPrices, fixedCosts }: any) => {
 
        {/* Print Header */}
        <div className="hidden print:block mb-6 border-b border-slate-900 pb-4">
-          <h1 className="text-3xl font-bold text-slate-900">Relatório de Custos de Reforma</h1>
-          <p className="text-slate-600">Gerado em: {new Date().toLocaleDateString()}</p>
+          <div className="flex justify-between items-center">
+             <h1 className="text-2xl font-bold text-slate-900">Relatório de Síntese - ReformaCalc Pro</h1>
+             <p className="text-sm text-slate-600">{new Date().toLocaleDateString()}</p>
+          </div>
        </div>
 
        <Card className="p-0 overflow-hidden print:shadow-none print:border print:border-slate-300">
