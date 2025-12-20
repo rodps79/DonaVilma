@@ -1,7 +1,8 @@
+
 import { Room, UnitPrice, FixedCost } from './types';
 
 export const INITIAL_PRICES: UnitPrice[] = [
-  // Demolition
+  // Demolição
   { id: '1', category: 'Demolição', item: 'Piso', unit: 'm²', priceLabor: 30.00, priceMaterial: 0, applyTo: 'demo_floor' },
   { id: '2', category: 'Demolição', item: 'Parede', unit: 'm²', priceLabor: 30.00, priceMaterial: 0, applyTo: 'demo_wall' },
   { id: '3', category: 'Demolição', item: 'Teto', unit: 'm²', priceLabor: 30.00, priceMaterial: 0, applyTo: 'demo_ceiling' },
@@ -23,8 +24,8 @@ export const INITIAL_PRICES: UnitPrice[] = [
 ];
 
 export const INITIAL_FIXED_COSTS: FixedCost[] = [
-  { id: 'f10', item: 'Ponto Interruptor', quantity: 0, priceLaborUnit: 50.00, priceMaterialUnit: 40.00 },
-  { id: 'f11', item: 'Ponto Tomada', quantity: 0, priceLaborUnit: 50.00, priceMaterialUnit: 45.00 },
+  { id: 'f10', item: 'Ponto Interruptor', quantity: 15, priceLaborUnit: 50.00, priceMaterialUnit: 40.00 },
+  { id: 'f11', item: 'Ponto Tomada', quantity: 25, priceLaborUnit: 50.00, priceMaterialUnit: 45.00 },
   { id: 'f1', item: 'Portas', quantity: 10, priceLaborUnit: 100, priceMaterialUnit: 400 },
   { id: 'f2', item: 'Janelas', quantity: 11, priceLaborUnit: 100, priceMaterialUnit: 550 },
   { id: 'f12', item: 'Alvenaria Nova (m²)', quantity: 0, priceLaborUnit: 70.00, priceMaterialUnit: 50.00 },
@@ -211,7 +212,7 @@ export const INITIAL_ROOMS: Room[] = [
   },
   {
     id: 'r11',
-    name: 'Corredor 1',
+    name: 'Corredor',
     type: 'terreo',
     width: 1.07,
     length: 5.00,
@@ -228,7 +229,7 @@ export const INITIAL_ROOMS: Room[] = [
   },
   {
     id: 'r20',
-    name: 'Corredor 2',
+    name: 'Circulação',
     type: 'terreo',
     width: 1.10,
     length: 3.43,

@@ -1,3 +1,4 @@
+
 export type RoomType = 'subsolo' | 'terreo' | 'superior' | 'externa';
 
 export interface Room {
@@ -8,9 +9,11 @@ export interface Room {
   length: number; // Comprimento (m)
   height: number; // Pé Direito (m)
   deductionArea: number; // Área de vãos a descontar (m2)
-  switchCount: number; // New: Number of switches
-  socketCount: number; // New: Number of sockets
   
+  // Added switchCount and socketCount to match project data and addRoom logic
+  switchCount: number;
+  socketCount: number;
+
   // Tasks (Boolean toggles matching the spreadsheet columns)
   tasks: {
     // Demolition
